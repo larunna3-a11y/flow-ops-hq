@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppScanningRouteImport } from './routes/_app.scanning'
 import { Route as AppPackingRouteImport } from './routes/_app.packing'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppScanningRoute = AppScanningRouteImport.update({
+  id: '/scanning',
+  path: '/scanning',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppPackingRoute = AppPackingRouteImport.update({
   id: '/packing',
@@ -38,11 +44,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof AppDashboardRoute
   '/packing': typeof AppPackingRoute
+  '/scanning': typeof AppScanningRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof AppDashboardRoute
   '/packing': typeof AppPackingRoute
+  '/scanning': typeof AppScanningRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -50,13 +58,20 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/packing': typeof AppPackingRoute
+  '/_app/scanning': typeof AppScanningRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/packing'
+  fullPaths: '/' | '/dashboard' | '/packing' | '/scanning'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/packing'
-  id: '__root__' | '/' | '/_app' | '/_app/dashboard' | '/_app/packing'
+  to: '/' | '/dashboard' | '/packing' | '/scanning'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/dashboard'
+    | '/_app/packing'
+    | '/_app/scanning'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -80,6 +95,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/scanning': {
+      id: '/_app/scanning'
+      path: '/scanning'
+      fullPath: '/scanning'
+      preLoaderRoute: typeof AppScanningRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/packing': {
       id: '/_app/packing'
       path: '/packing'
@@ -100,11 +122,13 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppPackingRoute: typeof AppPackingRoute
+  AppScanningRoute: typeof AppScanningRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppPackingRoute: AppPackingRoute,
+  AppScanningRoute: AppScanningRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
