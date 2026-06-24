@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
+import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppScanningRouteImport } from './routes/_app.scanning'
 import { Route as AppReturnsRouteImport } from './routes/_app.returns'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
@@ -30,6 +31,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppScanningRoute = AppScanningRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
+  '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesByTo {
@@ -74,6 +81,7 @@ export interface FileRoutesByTo {
   '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
+  '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesById {
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   '/_app/reports': typeof AppReportsRoute
   '/_app/returns': typeof AppReturnsRoute
   '/_app/scanning': typeof AppScanningRoute
+  '/_app/settings': typeof AppSettingsRoute
   '/_app/users': typeof AppUsersRoute
 }
 export interface FileRouteTypes {
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/returns'
     | '/scanning'
+    | '/settings'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/returns'
     | '/scanning'
+    | '/settings'
     | '/users'
   id:
     | '__root__'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '/_app/reports'
     | '/_app/returns'
     | '/_app/scanning'
+    | '/_app/settings'
     | '/_app/users'
   fileRoutesById: FileRoutesById
 }
@@ -144,6 +156,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/scanning': {
@@ -190,6 +209,7 @@ interface AppRouteChildren {
   AppReportsRoute: typeof AppReportsRoute
   AppReturnsRoute: typeof AppReturnsRoute
   AppScanningRoute: typeof AppScanningRoute
+  AppSettingsRoute: typeof AppSettingsRoute
   AppUsersRoute: typeof AppUsersRoute
 }
 
@@ -199,6 +219,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReportsRoute: AppReportsRoute,
   AppReturnsRoute: AppReturnsRoute,
   AppScanningRoute: AppScanningRoute,
+  AppSettingsRoute: AppSettingsRoute,
   AppUsersRoute: AppUsersRoute,
 }
 
