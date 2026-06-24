@@ -78,14 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "FlowOps — Warehouse Operations Platform" },
+      { name: "description", content: "FlowOps is a modern warehouse operations platform for e-commerce brands, marketplace sellers and warehouse teams." },
+      { name: "author", content: "FlowOps" },
+      { property: "og:title", content: "FlowOps — Warehouse Operations Platform" },
+      { property: "og:description", content: "Packing, scanning, returns and analytics for modern e-commerce warehouses." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
