@@ -82,9 +82,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "FlowOps is a modern warehouse operations platform for e-commerce brands, marketplace sellers and warehouse teams." },
       { name: "author", content: "FlowOps" },
       { property: "og:title", content: "FlowOps — Warehouse Operations Platform" },
-      { property: "og:description", content: "Packing, scanning, returns and analytics for modern e-commerce warehouses." },
+      { property: "og:description", content: "FlowOps is a modern warehouse operations platform for e-commerce brands, marketplace sellers and warehouse teams." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "FlowOps — Warehouse Operations Platform" },
+      { name: "twitter:description", content: "FlowOps is a modern warehouse operations platform for e-commerce brands, marketplace sellers and warehouse teams." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/552069a9-25d7-47a7-903b-8ac78808577c" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/552069a9-25d7-47a7-903b-8ac78808577c" },
     ],
     links: [
       {
