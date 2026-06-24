@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppScanningRouteImport } from './routes/_app.scanning'
 import { Route as AppReturnsRouteImport } from './routes/_app.returns'
+import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPackingRouteImport } from './routes/_app.packing'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 
@@ -35,6 +36,11 @@ const AppReturnsRoute = AppReturnsRouteImport.update({
   path: '/returns',
   getParentRoute: () => AppRoute,
 } as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPackingRoute = AppPackingRouteImport.update({
   id: '/packing',
   path: '/packing',
@@ -50,6 +56,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof AppDashboardRoute
   '/packing': typeof AppPackingRoute
+  '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
 }
@@ -57,6 +64,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof AppDashboardRoute
   '/packing': typeof AppPackingRoute
+  '/reports': typeof AppReportsRoute
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
 }
@@ -66,20 +74,28 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/packing': typeof AppPackingRoute
+  '/_app/reports': typeof AppReportsRoute
   '/_app/returns': typeof AppReturnsRoute
   '/_app/scanning': typeof AppScanningRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/packing' | '/returns' | '/scanning'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/packing'
+    | '/reports'
+    | '/returns'
+    | '/scanning'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/packing' | '/returns' | '/scanning'
+  to: '/' | '/dashboard' | '/packing' | '/reports' | '/returns' | '/scanning'
   id:
     | '__root__'
     | '/'
     | '/_app'
     | '/_app/dashboard'
     | '/_app/packing'
+    | '/_app/reports'
     | '/_app/returns'
     | '/_app/scanning'
   fileRoutesById: FileRoutesById
@@ -119,6 +135,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReturnsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/reports': {
+      id: '/_app/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/packing': {
       id: '/_app/packing'
       path: '/packing'
@@ -139,6 +162,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppPackingRoute: typeof AppPackingRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppReturnsRoute: typeof AppReturnsRoute
   AppScanningRoute: typeof AppScanningRoute
 }
@@ -146,6 +170,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppPackingRoute: AppPackingRoute,
+  AppReportsRoute: AppReportsRoute,
   AppReturnsRoute: AppReturnsRoute,
   AppScanningRoute: AppScanningRoute,
 }
