@@ -3,11 +3,13 @@ import { useState } from "react";
 import { ArrowRight, Boxes } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { logActivity } from "@/lib/activity.functions";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -25,6 +27,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const log = useServerFn(logActivity);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,6 +49,7 @@ function LoginPage() {
       toast.error(error.message || t("auth.errors.invalidCredentials"));
       return;
     }
+    await log({ data: { action: "user.login", metadata: { email } } }).catch(() => undefined);
     navigate({ to: "/dashboard" });
   };
 

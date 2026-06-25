@@ -102,6 +102,68 @@ export type Database = {
           },
         ]
       }
+      packing_records: {
+        Row: {
+          courier: string | null
+          created_at: string
+          id: string
+          marketplace: string | null
+          order_number: string | null
+          packing_timestamp: string | null
+          raw_code: string
+          role: string | null
+          scan_timestamp: string
+          status: string
+          tracking_number: string | null
+          updated_at: string
+          user_id: string
+          user_name: string
+          workspace_id: string
+        }
+        Insert: {
+          courier?: string | null
+          created_at?: string
+          id?: string
+          marketplace?: string | null
+          order_number?: string | null
+          packing_timestamp?: string | null
+          raw_code: string
+          role?: string | null
+          scan_timestamp?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+          user_id: string
+          user_name: string
+          workspace_id: string
+        }
+        Update: {
+          courier?: string | null
+          created_at?: string
+          id?: string
+          marketplace?: string | null
+          order_number?: string | null
+          packing_timestamp?: string | null
+          raw_code?: string
+          role?: string | null
+          scan_timestamp?: string
+          status?: string
+          tracking_number?: string | null
+          updated_at?: string
+          user_id?: string
+          user_name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "packing_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_color: string
@@ -128,6 +190,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      returns: {
+        Row: {
+          assigned_to: string | null
+          assigned_to_name: string | null
+          created_at: string
+          id: string
+          marketplace: string | null
+          order_number: string | null
+          reason: string | null
+          received_at: string
+          rma: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          created_at?: string
+          id?: string
+          marketplace?: string | null
+          order_number?: string | null
+          reason?: string | null
+          received_at?: string
+          rma: string
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          assigned_to_name?: string | null
+          created_at?: string
+          id?: string
+          marketplace?: string | null
+          order_number?: string | null
+          reason?: string | null
+          received_at?: string
+          rma?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "returns_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       roles: {
         Row: {

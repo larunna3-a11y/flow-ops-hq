@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Bell, Moon, Search, Sun, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useServerFn } from "@tanstack/react-start";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,16 +15,32 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/theme-provider";
-import { currentUser } from "@/lib/mock-data";
 import { supabase } from "@/integrations/supabase/client";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useQuery } from "@tanstack/react-query";
+import { useWorkspace } from "@/lib/use-workspace";
+import { logActivity } from "@/lib/activity.functions";
 
 export function AppTopbar() {
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const ws = useWorkspace();
+  const log = useServerFn(logActivity);
 
-  const initials = currentUser.name.split(" ").map((p) => p[0]).join("").slice(0, 2);
+  const profile = useQuery({
+    queryKey: ["profile", ws.data?.userId],
+    enabled: !!ws.data?.userId,
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("full_name, email").eq("id", ws.data!.userId!).maybeSingle();
+      return data;
+    },
+  });
+
+  const name = profile.data?.full_name || profile.data?.email || "Operator";
+  const email = profile.data?.email || "";
+  const role = ws.data?.role || "Member";
+  const initials = name.split(" ").map((p: string) => p[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/85 px-4 backdrop-blur-md">
@@ -48,23 +65,22 @@ export function AppTopbar() {
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted transition-colors">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground"
-              style={{ background: currentUser.avatarColor }}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-primary-foreground bg-primary"
             >
               {initials}
             </div>
             <div className="hidden md:block text-left leading-tight">
-              <div className="text-sm font-medium">{currentUser.name}</div>
+              <div className="text-sm font-medium">{name}</div>
               <Badge variant="secondary" className="h-4 px-1.5 text-[10px] font-medium">
-                {currentUser.role}
+                {role}
               </Badge>
             </div>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>
-            <div className="font-medium">{currentUser.name}</div>
-            <div className="text-xs text-muted-foreground font-normal">{currentUser.email}</div>
+            <div className="font-medium">{name}</div>
+            <div className="text-xs text-muted-foreground font-normal">{email}</div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>{t("topbar.settings")}</DropdownMenuItem>
@@ -72,6 +88,7 @@ export function AppTopbar() {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={async () => {
+              await log({ data: { action: "user.logout" } }).catch(() => undefined);
               await supabase.auth.signOut();
               navigate({ to: "/" });
             }}
