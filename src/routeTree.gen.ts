@@ -24,6 +24,7 @@ import { Route as AppReturnsRouteImport } from './routes/_app.returns'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPackingRouteImport } from './routes/_app.packing'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
+import { Route as AppMarketplaceRouteImport } from './routes/_app.marketplace'
 import { Route as AppImportsRouteImport } from './routes/_app.imports'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 
@@ -101,6 +102,11 @@ const AppOrdersRoute = AppOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
+  id: '/marketplace',
+  path: '/marketplace',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppImportsRoute = AppImportsRouteImport.update({
   id: '/imports',
   path: '/imports',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRoute
   '/imports': typeof AppImportsRoute
+  '/marketplace': typeof AppMarketplaceRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRoute
   '/imports': typeof AppImportsRoute
+  '/marketplace': typeof AppMarketplaceRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/imports': typeof AppImportsRoute
+  '/_app/marketplace': typeof AppMarketplaceRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/packing': typeof AppPackingRoute
   '/_app/reports': typeof AppReportsRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/imports'
+    | '/marketplace'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/dashboard'
     | '/imports'
+    | '/marketplace'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_app/dashboard'
     | '/_app/imports'
+    | '/_app/marketplace'
     | '/_app/orders'
     | '/_app/packing'
     | '/_app/reports'
@@ -343,6 +355,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/marketplace': {
+      id: '/_app/marketplace'
+      path: '/marketplace'
+      fullPath: '/marketplace'
+      preLoaderRoute: typeof AppMarketplaceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/imports': {
       id: '/_app/imports'
       path: '/imports'
@@ -363,6 +382,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppImportsRoute: typeof AppImportsRoute
+  AppMarketplaceRoute: typeof AppMarketplaceRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPackingRoute: typeof AppPackingRoute
   AppReportsRoute: typeof AppReportsRoute
@@ -376,6 +396,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppImportsRoute: AppImportsRoute,
+  AppMarketplaceRoute: AppMarketplaceRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPackingRoute: AppPackingRoute,
   AppReportsRoute: AppReportsRoute,
