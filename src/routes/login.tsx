@@ -27,6 +27,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const log = useServerFn(logActivity);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,6 +49,7 @@ function LoginPage() {
       toast.error(error.message || t("auth.errors.invalidCredentials"));
       return;
     }
+    await log({ data: { action: "user.login", metadata: { email } } }).catch(() => undefined);
     navigate({ to: "/dashboard" });
   };
 
