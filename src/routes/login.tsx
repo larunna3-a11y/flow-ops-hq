@@ -3,11 +3,13 @@ import { useState } from "react";
 import { ArrowRight, Boxes } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { logActivity } from "@/lib/activity.functions";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
