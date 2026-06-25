@@ -171,6 +171,44 @@ function DashboardPage() {
         <StatCard label="Active packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
       </div>
 
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard
+          label={t("dashboard.kpisExt.ordersWaiting")}
+          value={String((orders.data ?? []).filter((o) => o.packing_status === "waiting").length)}
+          icon={<Truck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.ordersAssigned")}
+          value={String((orders.data ?? []).filter((o) => o.packing_status === "assigned").length)}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.packedToday")}
+          value={String(
+            (orders.data ?? []).filter(
+              (o) =>
+                o.packing_status === "packed" &&
+                new Date(o.updated_at).toDateString() === new Date().toDateString(),
+            ).length,
+          )}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.connectedStores")}
+          value={String((stores.data ?? []).filter((s) => s.connection_status === "connected").length)}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.lastImport")}
+          value={
+            imports.data && imports.data[0]
+              ? new Date(imports.data[0].created_at).toLocaleDateString()
+              : "—"
+          }
+          icon={<ScanLine className="h-4 w-4" />}
+        />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-lg border bg-card p-5 shadow-card">
           <div className="flex items-center justify-between">
