@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { ThemeProvider } from "../components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import "@/i18n";
+import { useTranslation } from "react-i18next";
 
 function NotFoundComponent() {
   return (
