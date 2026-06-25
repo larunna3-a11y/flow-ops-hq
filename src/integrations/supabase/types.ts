@@ -361,15 +361,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      log_activity: {
-        Args: {
-          _action: string
-          _metadata?: Json
-          _target_id?: string
-          _target_type?: string
-        }
-        Returns: string
-      }
+      [_ in never]: never
     }
     Enums: {
       app_role: "Owner" | "Supervisor" | "Packer" | "Return Staff"
