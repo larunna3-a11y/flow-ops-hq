@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { UserPlus, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill, statusToTone } from "@/components/status-pill";
@@ -53,6 +54,7 @@ const roleTone = (r: Role) =>
   r === "Owner" ? "primary" : r === "Supervisor" ? "info" : r === "Packer" ? "success" : "warning";
 
 function UsersPage() {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("Packer");
@@ -61,14 +63,14 @@ function UsersPage() {
   const sendInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!email) {
-      toast.error("Enter an email address.");
+      toast.error(t("users.toast.missingEmail"));
       return;
     }
     setSending(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) {
       setSending(false);
-      toast.error("You must be signed in.");
+      toast.error(t("users.toast.mustSignIn"));
       return;
     }
     const { data: membership } = await supabase
@@ -78,7 +80,7 @@ function UsersPage() {
       .maybeSingle();
     if (!membership) {
       setSending(false);
-      toast.error("No workspace found for your account.");
+      toast.error(t("users.toast.noWorkspace"));
       return;
     }
     const { error } = await supabase.from("invitations").insert({
@@ -89,10 +91,10 @@ function UsersPage() {
     });
     setSending(false);
     if (error) {
-      toast.error(error.message || "Only Owners can invite members.");
+      toast.error(error.message || t("users.toast.ownerOnly"));
       return;
     }
-    toast.success(`Invitation sent to ${email}`);
+    toast.success(t("users.toast.sent", { email }));
     setInviteEmail("");
     setOpen(false);
   };
@@ -100,33 +102,33 @@ function UsersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="User management"
-        description="Owner-only. Invite teammates and assign roles for warehouse operations."
+        title={t("users.title")}
+        description={t("users.description")}
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><UserPlus className="h-4 w-4" /> Invite member</Button>
+              <Button size="sm"><UserPlus className="h-4 w-4" /> {t("users.invite")}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite a teammate</DialogTitle>
+                <DialogTitle>{t("users.dialog.title")}</DialogTitle>
                 <DialogDescription>
-                  They'll receive an email invitation to join your workspace. No public sign-up is allowed.
+                  {t("users.dialog.description")}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-email">Work email</Label>
+                  <Label htmlFor="invite-email">{t("users.dialog.email")}</Label>
                   <Input
                     id="invite-email"
                     type="email"
-                    placeholder="name@company.com"
+                    placeholder={t("users.dialog.emailPlaceholder")}
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-role">Role</Label>
+                  <Label htmlFor="invite-role">{t("users.dialog.role")}</Label>
                   <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as Role)}>
                     <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -138,9 +140,9 @@ function UsersPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
                 <Button onClick={sendInvite} disabled={sending}>
-                  {sending ? "Sending…" : "Send invite"}
+                  {sending ? t("common.sending") : t("users.dialog.send")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -152,20 +154,20 @@ function UsersPage() {
         <div className="flex items-center justify-between border-b p-4">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-semibold">{users.length}</span>
-            <span className="text-muted-foreground">members</span>
+            <span className="text-muted-foreground">{t("common.members")}</span>
             <span className="text-muted-foreground">·</span>
-            <Badge variant="secondary">{users.filter(u => u.status === "active").length} active</Badge>
-            <Badge variant="outline">{users.filter(u => u.status === "invited").length} pending</Badge>
+            <Badge variant="secondary">{users.filter(u => u.status === "active").length} {t("common.active")}</Badge>
+            <Badge variant="outline">{users.filter(u => u.status === "invited").length} {t("common.pending")}</Badge>
           </div>
-          <Input placeholder="Search members" className="h-9 w-64" />
+          <Input placeholder={t("users.searchPlaceholder")} className="h-9 w-64" />
         </div>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last active</TableHead>
+              <TableHead>{t("users.columns.member")}</TableHead>
+              <TableHead>{t("users.columns.role")}</TableHead>
+              <TableHead>{t("users.columns.status")}</TableHead>
+              <TableHead>{t("users.columns.lastActive")}</TableHead>
               <TableHead className="text-right" />
             </TableRow>
           </TableHeader>
@@ -199,11 +201,11 @@ function UsersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Change role</DropdownMenuItem>
-                        <DropdownMenuItem>Resend invite</DropdownMenuItem>
+                        <DropdownMenuItem>{t("users.actions.changeRole")}</DropdownMenuItem>
+                        <DropdownMenuItem>{t("users.actions.resend")}</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive focus:text-destructive">
-                          Remove from workspace
+                          {t("users.actions.remove")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
