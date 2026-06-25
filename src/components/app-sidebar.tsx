@@ -9,6 +9,7 @@ import {
   Settings,
   Boxes,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Sidebar,
   SidebarContent,
@@ -24,27 +25,28 @@ import {
 } from "@/components/ui/sidebar";
 import { workspace } from "@/lib/mock-data";
 
-const operations = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Packing", url: "/packing", icon: PackageCheck },
-  { title: "Scan Tracking", url: "/scanning", icon: ScanLine },
-  { title: "Returns", url: "/returns", icon: RotateCcw },
-];
-
-const insights = [
-  { title: "Reports", url: "/reports", icon: BarChart3 },
-];
-
-const admin = [
-  { title: "Users", url: "/users", icon: Users },
-  { title: "Settings", url: "/settings", icon: Settings },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
+  const { t } = useTranslation();
+
+  const operations = [
+    { title: t("sidebar.items.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck },
+    { title: t("sidebar.items.scanning"), url: "/scanning", icon: ScanLine },
+    { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw },
+  ];
+
+  const insights = [
+    { title: t("sidebar.items.reports"), url: "/reports", icon: BarChart3 },
+  ];
+
+  const admin = [
+    { title: t("sidebar.items.users"), url: "/users", icon: Users },
+    { title: t("sidebar.items.settings"), url: "/settings", icon: Settings },
+  ];
 
   const renderGroup = (label: string, items: typeof operations) => (
     <SidebarGroup>
@@ -83,16 +85,16 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {renderGroup("Operations", operations)}
-        {renderGroup("Insights", insights)}
-        {renderGroup("Workspace", admin)}
+        {renderGroup(t("sidebar.groups.operations"), operations)}
+        {renderGroup(t("sidebar.groups.insights"), insights)}
+        {renderGroup(t("sidebar.groups.workspace"), admin)}
       </SidebarContent>
 
       <SidebarFooter>
         {!collapsed && (
           <div className="rounded-md border bg-card p-3 text-xs">
-            <div className="font-medium text-foreground">{workspace.plan} plan</div>
-            <div className="mt-0.5 text-muted-foreground">{workspace.members} members</div>
+            <div className="font-medium text-foreground">{t("sidebar.plan", { plan: workspace.plan })}</div>
+            <div className="mt-0.5 text-muted-foreground">{t("sidebar.membersCount", { count: workspace.members })}</div>
           </div>
         )}
       </SidebarFooter>
