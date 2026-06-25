@@ -17,6 +17,7 @@ import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
+import { Route as AppStoresRouteImport } from './routes/_app.stores'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppScanningRouteImport } from './routes/_app.scanning'
 import { Route as AppReturnsRouteImport } from './routes/_app.returns'
@@ -63,6 +64,11 @@ const AppUsersRoute = AppUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppStoresRoute = AppStoresRouteImport.update({
+  id: '/stores',
+  path: '/stores',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
   '/settings': typeof AppSettingsRoute
+  '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesByTo {
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/returns': typeof AppReturnsRoute
   '/scanning': typeof AppScanningRoute
   '/settings': typeof AppSettingsRoute
+  '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesById {
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/_app/returns': typeof AppReturnsRoute
   '/_app/scanning': typeof AppScanningRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/stores': typeof AppStoresRoute
   '/_app/users': typeof AppUsersRoute
 }
 export interface FileRouteTypes {
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/returns'
     | '/scanning'
     | '/settings'
+    | '/stores'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/returns'
     | '/scanning'
     | '/settings'
+    | '/stores'
     | '/users'
   id:
     | '__root__'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/_app/returns'
     | '/_app/scanning'
     | '/_app/settings'
+    | '/_app/stores'
     | '/_app/users'
   fileRoutesById: FileRoutesById
 }
@@ -258,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/stores': {
+      id: '/_app/stores'
+      path: '/stores'
+      fullPath: '/stores'
+      preLoaderRoute: typeof AppStoresRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -310,6 +329,7 @@ interface AppRouteChildren {
   AppReturnsRoute: typeof AppReturnsRoute
   AppScanningRoute: typeof AppScanningRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppStoresRoute: typeof AppStoresRoute
   AppUsersRoute: typeof AppUsersRoute
 }
 
@@ -320,6 +340,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppReturnsRoute: AppReturnsRoute,
   AppScanningRoute: AppScanningRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppStoresRoute: AppStoresRoute,
   AppUsersRoute: AppUsersRoute,
 }
 
