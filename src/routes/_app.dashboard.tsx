@@ -86,6 +86,18 @@ function DashboardPage() {
     }
   }, [ws.data?.role, records.isSuccess, records.data?.length, returns.isSuccess, returns.data?.length, seed, qc]);
 
+  useEffect(() => {
+    if (ws.data?.role === "Owner" && stores.isSuccess && stores.data.length === 0) {
+      seedS2()
+        .then(() => {
+          qc.invalidateQueries({ queryKey: ["stores"] });
+          qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["imports"] });
+        })
+        .catch(() => undefined);
+    }
+  }, [ws.data?.role, stores.isSuccess, stores.data?.length, seedS2, qc]);
+
   const data = records.data ?? [];
   const ret = returns.data ?? [];
 
