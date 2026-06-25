@@ -372,6 +372,17 @@
     },
     "success": {
       "workspaceCreated": "Workspace berhasil dibuat. Selamat bergabung!"
+    },
+    "reset": {
+      "title": "Atur kata sandi baru",
+      "subtitle": "Pilih kata sandi yang kuat untuk akun FlowOps Anda.",
+      "newPassword": "Kata sandi baru",
+      "confirm": "Konfirmasi kata sandi",
+      "submit": "Perbarui kata sandi",
+      "success": "Kata sandi diperbarui. Anda sudah masuk.",
+      "weak": "Kata sandi minimal 8 karakter.",
+      "mismatch": "Kata sandi tidak cocok.",
+      "waiting": "Buka halaman ini melalui tautan email reset kata sandi untuk melanjutkan."
     }
   },
   "sidebar": {
@@ -579,6 +590,7 @@
     "title": "Manajemen user",
     "description": "Hanya Owner. Undang rekan tim dan tetapkan peran untuk operasional gudang.",
     "invite": "Undang anggota",
+    "empty": "Belum ada anggota.",
     "dialog": {
       "title": "Undang rekan tim",
       "description": "Mereka akan menerima email undangan untuk bergabung dengan workspace Anda. Pendaftaran publik tidak diizinkan.",
@@ -594,9 +606,19 @@
       "status": "Status",
       "lastActive": "Aktivitas terakhir"
     },
+    "invitations": {
+      "title": "Undangan",
+      "empty": "Belum ada undangan.",
+      "columns": { "email": "Email", "expires": "Kedaluwarsa" }
+    },
     "actions": {
-      "changeRole": "Ubah peran",
+      "makeRole": "Jadikan {{role}}",
       "resend": "Kirim ulang undangan",
+      "revoke": "Cabut undangan",
+      "resetPassword": "Kirim reset kata sandi",
+      "deactivate": "Nonaktifkan user",
+      "activate": "Aktifkan kembali user",
+      "changeRole": "Ubah peran",
       "remove": "Hapus dari workspace"
     },
     "toast": {
@@ -604,7 +626,15 @@
       "mustSignIn": "Anda harus masuk terlebih dahulu.",
       "noWorkspace": "Tidak ada workspace untuk akun Anda.",
       "ownerOnly": "Hanya Owner yang dapat mengundang anggota.",
-      "sent": "Undangan terkirim ke {{email}}"
+      "alreadyMember": "Email ini sudah menjadi anggota workspace.",
+      "alreadyInvited": "Undangan untuk email ini masih menunggu.",
+      "sent": "Undangan terkirim ke {{email}}",
+      "resent": "Undangan diperbarui untuk {{email}}",
+      "revoked": "Undangan dicabut.",
+      "roleChanged": "Peran diperbarui.",
+      "deactivated": "User dinonaktifkan.",
+      "activated": "User diaktifkan kembali.",
+      "resetSent": "Email reset kata sandi terkirim ke {{email}}"
     }
   },
   "settings": {
@@ -613,8 +643,21 @@
     "workspace": {
       "title": "Workspace",
       "subtitle": "Hanya Owner yang dapat mengubah detail workspace.",
-      "name": "Nama workspace",
-      "slug": "URL slug"
+      "subtitleOwner": "Ubah profil perusahaan, preferensi regional, dan branding.",
+      "name": "Nama perusahaan",
+      "slug": "URL slug",
+      "address": "Alamat perusahaan",
+      "addressPlaceholder": "Jl. Sudirman No. 1, Jakarta",
+      "timezone": "Zona waktu",
+      "language": "Bahasa default",
+      "currency": "Mata uang",
+      "logo": "Logo perusahaan",
+      "logoHint": "PNG atau JPG persegi, maks 2 MB.",
+      "uploadLogo": "Unggah logo",
+      "logoUploaded": "Logo diperbarui.",
+      "logoTooBig": "Logo maksimal 2 MB.",
+      "nameRequired": "Nama perusahaan wajib diisi.",
+      "saved": "Workspace diperbarui."
     },
     "appearance": {
       "title": "Tampilan",
@@ -626,18 +669,9 @@
       "title": "Notifikasi",
       "subtitle": "Tentukan peringatan apa yang diterima tim Anda.",
       "items": {
-        "scanMismatch": {
-          "title": "Peringatan scan tidak cocok",
-          "desc": "Beri tahu supervisor saat sebuah station memiliki lebih dari 3 scan tidak cocok dalam satu jam."
-        },
-        "slaBreach": {
-          "title": "Peringatan pelanggaran SLA",
-          "desc": "Beri peringatan saat waktu packing melebihi target station."
-        },
-        "dailySummary": {
-          "title": "Email ringkasan harian",
-          "desc": "Terima ringkasan operasional kemarin setiap pagi."
-        }
+        "scanMismatch": { "title": "Peringatan scan tidak cocok", "desc": "Beri tahu supervisor saat sebuah station memiliki lebih dari 3 scan tidak cocok dalam satu jam." },
+        "slaBreach": { "title": "Peringatan pelanggaran SLA", "desc": "Beri peringatan saat waktu packing melebihi target station." },
+        "dailySummary": { "title": "Email ringkasan harian", "desc": "Terima ringkasan operasional kemarin setiap pagi." }
       }
     },
     "danger": {
