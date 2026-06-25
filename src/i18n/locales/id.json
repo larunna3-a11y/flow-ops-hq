@@ -372,6 +372,17 @@
     },
     "success": {
       "workspaceCreated": "Workspace berhasil dibuat. Selamat bergabung!"
+    },
+    "reset": {
+      "title": "Atur kata sandi baru",
+      "subtitle": "Pilih kata sandi yang kuat untuk akun FlowOps Anda.",
+      "newPassword": "Kata sandi baru",
+      "confirm": "Konfirmasi kata sandi",
+      "submit": "Perbarui kata sandi",
+      "success": "Kata sandi diperbarui. Anda sudah masuk.",
+      "weak": "Kata sandi minimal 8 karakter.",
+      "mismatch": "Kata sandi tidak cocok.",
+      "waiting": "Buka halaman ini melalui tautan email reset kata sandi untuk melanjutkan."
     }
   },
   "sidebar": {
