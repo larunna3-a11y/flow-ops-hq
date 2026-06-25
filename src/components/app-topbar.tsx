@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/theme-provider";
 import { currentUser } from "@/lib/mock-data";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AppTopbar() {
   const { theme, toggle } = useTheme();
