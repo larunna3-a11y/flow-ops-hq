@@ -393,10 +393,14 @@
     },
     "items": {
       "dashboard": "Dashboard",
+      "orders": "Order",
       "packing": "Packing",
       "scanning": "Scan Tracking",
       "returns": "Retur",
       "reports": "Laporan",
+      "imports": "Riwayat Sinkron",
+      "stores": "Toko Terhubung",
+      "marketplace": "Koneksi Marketplace",
       "users": "User",
       "settings": "Pengaturan"
     },
