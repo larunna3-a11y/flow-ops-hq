@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Boxes, Check, ShieldCheck, Users, Zap } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -23,10 +25,38 @@ function SignupPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const data = new FormData(form);
+    const workspaceName = String(data.get("ws-name") || "").trim();
+    const fullName = String(data.get("owner-name") || "").trim();
+    const email = String(data.get("owner-email") || "").trim();
+    const password = String(data.get("new-password") || "");
+
+    if (!workspaceName || !fullName || !email || password.length < 8) {
+      toast.error("Please complete every field (password ≥ 8 characters).");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => navigate({ to: "/dashboard" }), 400);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: { full_name: fullName, workspace_name: workspaceName },
+      },
+    });
+    setLoading(false);
+
+    if (error) {
+      // Surfaces the trigger's "invitation required" message after first workspace exists.
+      toast.error(error.message || "Could not create workspace.");
+      return;
+    }
+    toast.success("Workspace created. Welcome aboard!");
+    navigate({ to: "/dashboard" });
   };
 
   return (
