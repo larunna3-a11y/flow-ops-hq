@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, Zap } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,11 @@ import { useTheme } from "@/components/theme-provider";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { setLanguage } from "@/i18n";
+import {
+  useWorkspacePreferences,
+  useSaveNotificationPrefs,
+  type NotificationPrefs,
+} from "@/lib/use-automation-rules";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({
@@ -55,6 +61,7 @@ function SettingsPage() {
   const workspace = data?.workspace ?? null;
   const isOwner = data?.role === "Owner";
 
+  // Workspace form state
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [address, setAddress] = useState("");
@@ -65,6 +72,16 @@ function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Notification preferences
+  const { data: prefs, isLoading: prefsLoading } = useWorkspacePreferences();
+  const savePrefs = useSaveNotificationPrefs();
+  const [notifications, setNotifications] = useState<NotificationPrefs>({
+    scanMismatch: true,
+    slaBreach: true,
+    dailySummary: false,
+  });
+  const [savingNotifs, setSavingNotifs] = useState(false);
 
   useEffect(() => {
     if (!workspace) return;
@@ -77,7 +94,11 @@ function SettingsPage() {
     setLogoUrl(workspace.logo_url);
   }, [workspace]);
 
-  const notificationKeys = ["scanMismatch", "slaBreach", "dailySummary"] as const;
+  useEffect(() => {
+    if (prefs?.notifications) {
+      setNotifications(prefs.notifications);
+    }
+  }, [prefs]);
 
   const saveWorkspace = async () => {
     if (!workspace || !isOwner) return;
@@ -122,14 +143,39 @@ function SettingsPage() {
     toast.success(t("settings.workspace.logoUploaded"));
   };
 
+  const saveNotifications = async () => {
+    if (!isOwner) return;
+    setSavingNotifs(true);
+    try {
+      await savePrefs.mutateAsync(notifications);
+      toast.success("Notification preferences saved.");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to save preferences.");
+    } finally {
+      setSavingNotifs(false);
+    }
+  };
+
+  const notificationKeys = [
+    "scanMismatch",
+    "slaBreach",
+    "dailySummary",
+  ] as const;
+
   return (
     <div className="space-y-6 max-w-3xl">
-      <PageHeader title={t("settings.title")} description={t("settings.description")} />
+      <PageHeader
+        title={t("settings.title")}
+        description={t("settings.description")}
+      />
 
+      {/* Workspace */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.workspace.title")}</h3>
         <p className="text-xs text-muted-foreground">
-          {isOwner ? t("settings.workspace.subtitleOwner") : t("settings.workspace.subtitle")}
+          {isOwner
+            ? t("settings.workspace.subtitleOwner")
+            : t("settings.workspace.subtitle")}
         </p>
 
         <div className="mt-5 flex items-start gap-4">
@@ -171,11 +217,21 @@ function SettingsPage() {
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="ws-name">{t("settings.workspace.name")}</Label>
-            <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} disabled={!isOwner || isLoading} />
+            <Input
+              id="ws-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!isOwner || isLoading}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="ws-slug">{t("settings.workspace.slug")}</Label>
-            <Input id="ws-slug" value={slug} onChange={(e) => setSlug(e.target.value)} disabled={!isOwner || isLoading} />
+            <Input
+              id="ws-slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              disabled={!isOwner || isLoading}
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="ws-address">{t("settings.workspace.address")}</Label>
@@ -191,27 +247,45 @@ function SettingsPage() {
           <div className="space-y-1.5">
             <Label>{t("settings.workspace.timezone")}</Label>
             <Select value={timezone} onValueChange={setTimezone} disabled={!isOwner}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {TIMEZONES.map((tz) => (<SelectItem key={tz} value={tz}>{tz}</SelectItem>))}
+                {TIMEZONES.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label>{t("settings.workspace.language")}</Label>
             <Select value={language} onValueChange={setLanguageState} disabled={!isOwner}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {LANGUAGES.map((l) => (<SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>))}
+                {LANGUAGES.map((l) => (
+                  <SelectItem key={l.code} value={l.code}>
+                    {l.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label>{t("settings.workspace.currency")}</Label>
             <Select value={currency} onValueChange={setCurrency} disabled={!isOwner}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {CURRENCIES.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -224,24 +298,54 @@ function SettingsPage() {
         </div>
       </section>
 
+      {/* Automation rules shortcut */}
+      <section className="rounded-lg border bg-card p-6 shadow-card">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Zap className="h-4 w-4 text-primary" />
+              Automation Rules
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Configure barcode detection rules that auto-fill marketplace and
+              courier on every scan.
+            </p>
+          </div>
+          {isOwner && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/automation">Manage rules</Link>
+            </Button>
+          )}
+        </div>
+      </section>
+
+      {/* Appearance */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.appearance.title")}</h3>
-        <p className="text-xs text-muted-foreground">{t("settings.appearance.subtitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.appearance.subtitle")}
+        </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           {(["light", "dark"] as const).map((th) => (
             <button
               key={th}
               onClick={() => setTheme(th)}
               className={`rounded-md border p-4 text-left transition ${
-                theme === th ? "border-primary ring-2 ring-primary/30" : "hover:border-foreground/20"
+                theme === th
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "hover:border-foreground/20"
               }`}
             >
-              <div className="text-sm font-medium">{t(`settings.appearance.${th}`)}</div>
-              <div className="mt-2 h-12 rounded border bg-gradient-to-br"
+              <div className="text-sm font-medium">
+                {t(`settings.appearance.${th}`)}
+              </div>
+              <div
+                className="mt-2 h-12 rounded border bg-gradient-to-br"
                 style={{
-                  background: th === "dark"
-                    ? "linear-gradient(135deg, oklch(0.16 0.02 250), oklch(0.26 0.025 250))"
-                    : "linear-gradient(135deg, oklch(0.99 0.005 240), oklch(0.92 0.01 240))"
+                  background:
+                    th === "dark"
+                      ? "linear-gradient(135deg, oklch(0.16 0.02 250), oklch(0.26 0.025 250))"
+                      : "linear-gradient(135deg, oklch(0.99 0.005 240), oklch(0.92 0.01 240))",
                 }}
               />
             </button>
@@ -249,27 +353,61 @@ function SettingsPage() {
         </div>
       </section>
 
+      {/* Notifications — now persisted */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.notifications.title")}</h3>
-        <p className="text-xs text-muted-foreground">{t("settings.notifications.subtitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.notifications.subtitle")}
+        </p>
         <div className="mt-4 space-y-4">
-          {notificationKeys.map((k, i) => (
+          {notificationKeys.map((k) => (
             <div key={k} className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-medium">{t(`settings.notifications.items.${k}.title`)}</div>
-                <div className="text-xs text-muted-foreground">{t(`settings.notifications.items.${k}.desc`)}</div>
+                <div className="text-sm font-medium">
+                  {t(`settings.notifications.items.${k}.title`)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t(`settings.notifications.items.${k}.desc`)}
+                </div>
               </div>
-              <Switch defaultChecked={i !== 2} />
+              <Switch
+                checked={notifications[k]}
+                disabled={!isOwner || prefsLoading}
+                onCheckedChange={(v) =>
+                  setNotifications((prev) => ({ ...prev, [k]: v }))
+                }
+              />
             </div>
           ))}
         </div>
+        {isOwner && (
+          <>
+            <Separator className="my-4" />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                onClick={saveNotifications}
+                disabled={savingNotifs || prefsLoading}
+              >
+                {savingNotifs ? t("common.sending") : t("common.save")}
+              </Button>
+            </div>
+          </>
+        )}
       </section>
 
+      {/* Danger zone */}
       {isOwner && (
         <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-          <h3 className="text-sm font-semibold text-destructive">{t("settings.danger.title")}</h3>
-          <p className="text-xs text-muted-foreground mt-1">{t("settings.danger.subtitle")}</p>
-          <Button variant="destructive" size="sm" className="mt-4">{t("settings.danger.delete")}</Button>
+          <h3 className="text-sm font-semibold text-destructive">
+            {t("settings.danger.title")}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t("settings.danger.subtitle")}
+          </p>
+          <Button variant="destructive" size="sm" className="mt-4">
+            {t("settings.danger.delete")}
+          </Button>
         </section>
       )}
     </div>
