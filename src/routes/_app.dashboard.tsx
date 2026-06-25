@@ -70,7 +70,7 @@ function DashboardPage() {
       returns.isSuccess &&
       returns.data.length === 0
     ) {
-      seed({ data: undefined })
+      seed()
         .then(() => {
           qc.invalidateQueries({ queryKey: ["packing_records"] });
           qc.invalidateQueries({ queryKey: ["returns"] });
