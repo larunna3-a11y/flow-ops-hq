@@ -12,6 +12,7 @@ import {
   ShoppingCart,
   Plug,
   History,
+  Zap,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -53,6 +54,7 @@ export function AppSidebar() {
     { title: t("sidebar.items.stores"), url: "/stores", icon: Store },
     { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug },
     { title: t("sidebar.items.users"), url: "/users", icon: Users },
+    { title: "Automation", url: "/automation", icon: Zap },
     { title: t("sidebar.items.settings"), url: "/settings", icon: Settings },
   ];
 
@@ -102,7 +104,9 @@ export function AppSidebar() {
         {!collapsed && (
           <div className="rounded-md border bg-card p-3 text-xs">
             <div className="font-medium text-foreground">{t("sidebar.plan", { plan: workspace.plan })}</div>
-            <div className="mt-0.5 text-muted-foreground">{t("sidebar.membersCount", { count: workspace.members })}</div>
+            <div className="mt-0.5 text-muted-foreground">
+              {t("sidebar.membersCount", { count: workspace.members })}
+            </div>
           </div>
         )}
       </SidebarFooter>
