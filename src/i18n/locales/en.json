@@ -372,6 +372,17 @@
     },
     "success": {
       "workspaceCreated": "Workspace created. Welcome aboard!"
+    },
+    "reset": {
+      "title": "Set a new password",
+      "subtitle": "Choose a strong password for your FlowOps account.",
+      "newPassword": "New password",
+      "confirm": "Confirm password",
+      "submit": "Update password",
+      "success": "Password updated. You're signed in.",
+      "weak": "Password must be at least 8 characters.",
+      "mismatch": "Passwords don't match.",
+      "waiting": "Open this page from the password reset email link to continue."
     }
   },
   "sidebar": {
