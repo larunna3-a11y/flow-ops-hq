@@ -2,10 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Boxes } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -22,6 +24,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,7 +34,7 @@ function LoginPage() {
     const password = String(data.get("password") || "");
 
     if (!email || !password) {
-      toast.error("Enter your email and password.");
+      toast.error(t("auth.errors.missingCredentials"));
       return;
     }
 
@@ -40,7 +43,7 @@ function LoginPage() {
     setLoading(false);
 
     if (error) {
-      toast.error(error.message || "Invalid credentials.");
+      toast.error(error.message || t("auth.errors.invalidCredentials"));
       return;
     }
     navigate({ to: "/dashboard" });
@@ -56,55 +59,54 @@ function LoginPage() {
             </div>
             <span className="text-base font-semibold tracking-tight">FlowOps</span>
           </Link>
-          <div className="text-sm text-muted-foreground">
-            New here?{" "}
-            <Link to="/signup" className="font-medium text-primary hover:underline">
-              Create a workspace
-            </Link>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <LanguageSwitcher variant="marketing" />
+            <span>
+              {t("auth.login.newHere")}{" "}
+              <Link to="/signup" className="font-medium text-primary hover:underline">
+                {t("auth.login.createWorkspace")}
+              </Link>
+            </span>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("auth.login.title")}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            Sign in to your FlowOps workspace.
+            {t("auth.login.subtitle")}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="workspace">Workspace</Label>
-              <Input id="workspace" defaultValue="northwind" placeholder="your-workspace" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Work email</Label>
+              <Label htmlFor="email">{t("auth.login.email")}</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
                 defaultValue=""
-                placeholder="you@company.com"
+                placeholder={t("auth.login.emailPlaceholder")}
               />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("auth.login.password")}</Label>
                 <button
                   type="button"
                   className="text-xs font-medium text-primary hover:underline"
                 >
-                  Forgot?
+                  {t("auth.login.forgot")}
                 </button>
               </div>
               <Input id="password" name="password" type="password" defaultValue="" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in…" : "Sign in"}
+              {loading ? t("common.signingIn") : t("auth.login.submit")}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              No public sign-up. New members join by invite only.
+              {t("auth.login.noPublicSignup")}
             </p>
           </form>
         </div>
