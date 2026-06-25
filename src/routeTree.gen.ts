@@ -24,6 +24,7 @@ import { Route as AppReturnsRouteImport } from './routes/_app.returns'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPackingRouteImport } from './routes/_app.packing'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
+import { Route as AppImportsRouteImport } from './routes/_app.imports'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 
 const SignupRoute = SignupRouteImport.update({
@@ -100,6 +101,11 @@ const AppOrdersRoute = AppOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AppRoute,
 } as any)
+const AppImportsRoute = AppImportsRouteImport.update({
+  id: '/imports',
+  path: '/imports',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRoute
+  '/imports': typeof AppImportsRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/dashboard': typeof AppDashboardRoute
+  '/imports': typeof AppImportsRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/imports': typeof AppImportsRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/packing': typeof AppPackingRoute
   '/_app/reports': typeof AppReportsRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/dashboard'
+    | '/imports'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/dashboard'
+    | '/imports'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_app/dashboard'
+    | '/_app/imports'
     | '/_app/orders'
     | '/_app/packing'
     | '/_app/reports'
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/imports': {
+      id: '/_app/imports'
+      path: '/imports'
+      fullPath: '/imports'
+      preLoaderRoute: typeof AppImportsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -343,6 +362,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
+  AppImportsRoute: typeof AppImportsRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPackingRoute: typeof AppPackingRoute
   AppReportsRoute: typeof AppReportsRoute
@@ -355,6 +375,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
+  AppImportsRoute: AppImportsRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPackingRoute: AppPackingRoute,
   AppReportsRoute: AppReportsRoute,
