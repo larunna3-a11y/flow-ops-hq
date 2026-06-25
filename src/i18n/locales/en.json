@@ -393,10 +393,14 @@
     },
     "items": {
       "dashboard": "Dashboard",
+      "orders": "Orders",
       "packing": "Packing",
       "scanning": "Scan Tracking",
       "returns": "Returns",
       "reports": "Reports",
+      "imports": "Sync History",
+      "stores": "Connected Stores",
+      "marketplace": "Marketplace Connections",
       "users": "Users",
       "settings": "Settings"
     },
