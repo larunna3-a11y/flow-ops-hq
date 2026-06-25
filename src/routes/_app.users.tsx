@@ -78,10 +78,10 @@ const roleTone = (r: AppRole) =>
   r === "Owner" ? "primary" : r === "Supervisor" ? "info" : r === "Packer" ? "success" : "warning";
 
 const memberStatusTone = (s: Member["status"]) =>
-  s === "active" ? "success" : s === "suspended" ? "destructive" : "warning";
+  s === "active" ? "success" : s === "suspended" ? "danger" : "warning";
 
 const inviteStatusTone = (s: Invitation["status"]) =>
-  s === "pending" ? "warning" : s === "accepted" ? "success" : "destructive";
+  s === "pending" ? "warning" : s === "accepted" ? "success" : "danger";
 
 function UsersPage() {
   const { t } = useTranslation();

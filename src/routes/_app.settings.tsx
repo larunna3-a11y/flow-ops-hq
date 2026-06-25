@@ -89,7 +89,7 @@ function SettingsPage() {
       .eq("id", workspace.id);
     setSaving(false);
     if (error) return toast.error(error.message);
-    setLanguage(language);
+    setLanguage(language === "id" ? "id" : "en");
     toast.success(t("settings.workspace.saved"));
     qc.invalidateQueries({ queryKey: ["current-workspace"] });
   };
