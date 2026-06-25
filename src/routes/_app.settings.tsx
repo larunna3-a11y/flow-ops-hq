@@ -12,12 +12,22 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useTheme } from "@/components/theme-provider";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { setLanguage } from "@/i18n";
-import { useWorkspacePreferences, useSaveNotificationPrefs, type NotificationPrefs } from "@/lib/use-automation-rules";
+import {
+  useWorkspacePreferences,
+  useSaveNotificationPrefs,
+  type NotificationPrefs,
+} from "@/lib/use-automation-rules";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({
@@ -29,7 +39,14 @@ export const Route = createFileRoute("/_app/settings")({
   component: SettingsPage,
 });
 
-const TIMEZONES = ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura", "Asia/Singapore", "Asia/Kuala_Lumpur", "UTC"];
+const TIMEZONES = [
+  "Asia/Jakarta",
+  "Asia/Makassar",
+  "Asia/Jayapura",
+  "Asia/Singapore",
+  "Asia/Kuala_Lumpur",
+  "UTC",
+];
 const CURRENCIES = ["IDR", "USD", "SGD", "MYR", "EUR"];
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -111,9 +128,14 @@ function SettingsPage() {
       setUploading(false);
       return toast.error(uploadError.message);
     }
-    const { data: signed } = await supabase.storage.from("workspace-logos").createSignedUrl(path, 60 * 60 * 24 * 365);
+    const { data: signed } = await supabase.storage
+      .from("workspace-logos")
+      .createSignedUrl(path, 60 * 60 * 24 * 365);
     const url = signed?.signedUrl ?? null;
-    const { error: updateError } = await supabase.from("workspaces").update({ logo_url: url }).eq("id", workspace.id);
+    const { error: updateError } = await supabase
+      .from("workspaces")
+      .update({ logo_url: url })
+      .eq("id", workspace.id);
     setUploading(false);
     if (updateError) return toast.error(updateError.message);
     setLogoUrl(url);
@@ -134,17 +156,26 @@ function SettingsPage() {
     }
   };
 
-  const notificationKeys = ["scanMismatch", "slaBreach", "dailySummary"] as const;
+  const notificationKeys = [
+    "scanMismatch",
+    "slaBreach",
+    "dailySummary",
+  ] as const;
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <PageHeader title={t("settings.title")} description={t("settings.description")} />
+      <PageHeader
+        title={t("settings.title")}
+        description={t("settings.description")}
+      />
 
       {/* Workspace */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.workspace.title")}</h3>
         <p className="text-xs text-muted-foreground">
-          {isOwner ? t("settings.workspace.subtitleOwner") : t("settings.workspace.subtitle")}
+          {isOwner
+            ? t("settings.workspace.subtitleOwner")
+            : t("settings.workspace.subtitle")}
         </p>
 
         <div className="mt-5 flex items-start gap-4">
@@ -276,7 +307,8 @@ function SettingsPage() {
               Automation Rules
             </h3>
             <p className="text-xs text-muted-foreground mt-1">
-              Configure barcode detection rules that auto-fill marketplace and courier on every scan.
+              Configure barcode detection rules that auto-fill marketplace and
+              courier on every scan.
             </p>
           </div>
           {isOwner && (
@@ -290,17 +322,23 @@ function SettingsPage() {
       {/* Appearance */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.appearance.title")}</h3>
-        <p className="text-xs text-muted-foreground">{t("settings.appearance.subtitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.appearance.subtitle")}
+        </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           {(["light", "dark"] as const).map((th) => (
             <button
               key={th}
               onClick={() => setTheme(th)}
               className={`rounded-md border p-4 text-left transition ${
-                theme === th ? "border-primary ring-2 ring-primary/30" : "hover:border-foreground/20"
+                theme === th
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "hover:border-foreground/20"
               }`}
             >
-              <div className="text-sm font-medium">{t(`settings.appearance.${th}`)}</div>
+              <div className="text-sm font-medium">
+                {t(`settings.appearance.${th}`)}
+              </div>
               <div
                 className="mt-2 h-12 rounded border bg-gradient-to-br"
                 style={{
@@ -318,18 +356,26 @@ function SettingsPage() {
       {/* Notifications — now persisted */}
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.notifications.title")}</h3>
-        <p className="text-xs text-muted-foreground">{t("settings.notifications.subtitle")}</p>
+        <p className="text-xs text-muted-foreground">
+          {t("settings.notifications.subtitle")}
+        </p>
         <div className="mt-4 space-y-4">
           {notificationKeys.map((k) => (
             <div key={k} className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-sm font-medium">{t(`settings.notifications.items.${k}.title`)}</div>
-                <div className="text-xs text-muted-foreground">{t(`settings.notifications.items.${k}.desc`)}</div>
+                <div className="text-sm font-medium">
+                  {t(`settings.notifications.items.${k}.title`)}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {t(`settings.notifications.items.${k}.desc`)}
+                </div>
               </div>
               <Switch
                 checked={notifications[k]}
                 disabled={!isOwner || prefsLoading}
-                onCheckedChange={(v) => setNotifications((prev) => ({ ...prev, [k]: v }))}
+                onCheckedChange={(v) =>
+                  setNotifications((prev) => ({ ...prev, [k]: v }))
+                }
               />
             </div>
           ))}
@@ -338,7 +384,11 @@ function SettingsPage() {
           <>
             <Separator className="my-4" />
             <div className="flex justify-end">
-              <Button size="sm" onClick={saveNotifications} disabled={savingNotifs || prefsLoading}>
+              <Button
+                size="sm"
+                onClick={saveNotifications}
+                disabled={savingNotifs || prefsLoading}
+              >
                 {savingNotifs ? t("common.sending") : t("common.save")}
               </Button>
             </div>
@@ -349,8 +399,12 @@ function SettingsPage() {
       {/* Danger zone */}
       {isOwner && (
         <section className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
-          <h3 className="text-sm font-semibold text-destructive">{t("settings.danger.title")}</h3>
-          <p className="text-xs text-muted-foreground mt-1">{t("settings.danger.subtitle")}</p>
+          <h3 className="text-sm font-semibold text-destructive">
+            {t("settings.danger.title")}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t("settings.danger.subtitle")}
+          </p>
           <Button variant="destructive" size="sm" className="mt-4">
             {t("settings.danger.delete")}
           </Button>
