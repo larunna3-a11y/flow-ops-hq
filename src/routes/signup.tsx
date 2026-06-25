@@ -79,19 +79,19 @@ function SignupPage() {
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="ws-name">Workspace name</Label>
-              <Input id="ws-name" placeholder="Northwind Logistics" />
+              <Input id="ws-name" name="ws-name" placeholder="Northwind Logistics" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="owner-name">Your name</Label>
-              <Input id="owner-name" placeholder="Alex Morgan" />
+              <Input id="owner-name" name="owner-name" placeholder="Alex Morgan" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="owner-email">Work email</Label>
-              <Input id="owner-email" type="email" placeholder="you@company.com" />
+              <Input id="owner-email" name="owner-email" type="email" placeholder="you@company.com" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="new-password">Create password</Label>
-              <Input id="new-password" type="password" placeholder="At least 8 characters" />
+              <Input id="new-password" name="new-password" type="password" placeholder="At least 8 characters" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating workspace…" : "Create workspace as Owner"}
