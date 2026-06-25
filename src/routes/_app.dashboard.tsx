@@ -36,8 +36,10 @@ import {
   useReturns,
   useAuditLogs,
 } from "@/lib/use-warehouse-data";
+import { useOrders, useStores, useImports } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { seedDemoData } from "@/lib/demo-seed.functions";
+import { seedSprint2 } from "@/lib/sprint2-seed.functions";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({
@@ -57,9 +59,13 @@ function DashboardPage() {
   const qc = useQueryClient();
   const ws = useWorkspace();
   const seed = useServerFn(seedDemoData);
+  const seedS2 = useServerFn(seedSprint2);
   const records = usePackingRecords();
   const returns = useReturns();
   const activity = useAuditLogs(8);
+  const orders = useOrders();
+  const stores = useStores();
+  const imports = useImports();
 
   // Auto-seed demo data for owners on first visit if empty.
   useEffect(() => {
@@ -79,6 +85,18 @@ function DashboardPage() {
         .catch(() => undefined);
     }
   }, [ws.data?.role, records.isSuccess, records.data?.length, returns.isSuccess, returns.data?.length, seed, qc]);
+
+  useEffect(() => {
+    if (ws.data?.role === "Owner" && stores.isSuccess && stores.data.length === 0) {
+      seedS2()
+        .then(() => {
+          qc.invalidateQueries({ queryKey: ["stores"] });
+          qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["imports"] });
+        })
+        .catch(() => undefined);
+    }
+  }, [ws.data?.role, stores.isSuccess, stores.data?.length, seedS2, qc]);
 
   const data = records.data ?? [];
   const ret = returns.data ?? [];
@@ -151,6 +169,44 @@ function DashboardPage() {
         <StatCard label="Pending orders" value={String(stats.pending)} icon={<Truck className="h-4 w-4" />} />
         <StatCard label="Total returns" value={String(stats.totalReturns)} icon={<RotateCcw className="h-4 w-4" />} />
         <StatCard label="Active packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard
+          label={t("dashboard.kpisExt.ordersWaiting")}
+          value={String((orders.data ?? []).filter((o) => o.packing_status === "waiting").length)}
+          icon={<Truck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.ordersAssigned")}
+          value={String((orders.data ?? []).filter((o) => o.packing_status === "assigned").length)}
+          icon={<Users className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.packedToday")}
+          value={String(
+            (orders.data ?? []).filter(
+              (o) =>
+                o.packing_status === "packed" &&
+                new Date(o.updated_at).toDateString() === new Date().toDateString(),
+            ).length,
+          )}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.connectedStores")}
+          value={String((stores.data ?? []).filter((s) => s.connection_status === "connected").length)}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("dashboard.kpisExt.lastImport")}
+          value={
+            imports.data && imports.data[0]
+              ? new Date(imports.data[0].created_at).toLocaleDateString()
+              : "—"
+          }
+          icon={<ScanLine className="h-4 w-4" />}
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

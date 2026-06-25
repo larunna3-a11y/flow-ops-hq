@@ -393,10 +393,14 @@
     },
     "items": {
       "dashboard": "Dashboard",
+      "orders": "Order",
       "packing": "Packing",
       "scanning": "Scan Tracking",
       "returns": "Retur",
       "reports": "Laporan",
+      "imports": "Riwayat Sinkron",
+      "stores": "Toko Terhubung",
+      "marketplace": "Koneksi Marketplace",
       "users": "User",
       "settings": "Pengaturan"
     },
@@ -446,6 +450,13 @@
       "title": "3 station melaporkan ketidakcocokan scan",
       "body": "Pack Station 02 memiliki 4 scan tidak cocok dalam satu jam terakhir. Tinjau audit trail untuk investigasi.",
       "open": "Buka log scan"
+    },
+    "kpisExt": {
+      "ordersWaiting": "Order menunggu",
+      "ordersAssigned": "Order ditugaskan",
+      "packedToday": "Order dipacking hari ini",
+      "connectedStores": "Toko terhubung",
+      "lastImport": "Impor terakhir"
     }
   },
   "packing": {
@@ -678,6 +689,106 @@
       "title": "Zona berbahaya",
       "subtitle": "Hapus workspace ini secara permanen beserta seluruh datanya.",
       "delete": "Hapus workspace"
+    }
+  },
+  "stores": {
+    "title": "Toko Terhubung",
+    "description": "Kelola toko marketplace yang terhubung ke workspace ini.",
+    "add": "Tambah toko",
+    "empty": "Belum ada toko terhubung.",
+    "columns": {
+      "store": "Toko",
+      "marketplace": "Marketplace",
+      "storeStatus": "Status toko",
+      "connection": "Koneksi",
+      "lastSync": "Sinkron terakhir",
+      "created": "Dibuat"
+    },
+    "dialog": {
+      "title": "Tambah toko terhubung",
+      "name": "Nama toko",
+      "marketplace": "Marketplace",
+      "save": "Simpan toko"
+    },
+    "toast": {
+      "added": "Toko ditambahkan.",
+      "connected": "Toko terhubung.",
+      "disconnected": "Toko diputus.",
+      "synced": "Sinkronisasi dipicu."
+    }
+  },
+  "marketplace": {
+    "title": "Koneksi Marketplace",
+    "description": "Hubungkan Shopee, TikTok Shop, Tokopedia, Lazada, dan Blibli. Saat ini mock — integrasi OAuth menyusul.",
+    "connect": "Hubungkan",
+    "disconnect": "Putuskan",
+    "sync": "Sinkron sekarang",
+    "connected": "Terhubung",
+    "disconnected": "Terputus",
+    "lastSync": "Sinkron terakhir",
+    "storesCount": "{{count}} toko terhubung",
+    "noStores": "Belum ada toko terhubung"
+  },
+  "orders": {
+    "title": "Order",
+    "description": "Semua order marketplace, status packing, dan penugasan.",
+    "searchPlaceholder": "Cari order, resi, pelanggan…",
+    "empty": "Belum ada order. Impor file atau gunakan data demo.",
+    "filters": {
+      "allMarketplaces": "Semua marketplace",
+      "allStores": "Semua toko",
+      "allStatuses": "Semua status"
+    },
+    "columns": {
+      "order": "No. Order",
+      "marketplace": "Marketplace",
+      "store": "Toko",
+      "customer": "Pelanggan",
+      "tracking": "No. Resi",
+      "courier": "Kurir",
+      "packing": "Packing",
+      "assigned": "Ditugaskan",
+      "created": "Dibuat"
+    },
+    "status": {
+      "waiting": "Menunggu",
+      "assigned": "Ditugaskan",
+      "packing": "Packing",
+      "packed": "Selesai packing",
+      "shipped": "Dikirim"
+    },
+    "assign": {
+      "label": "Tugaskan ke packer",
+      "placeholder": "Pilih packer",
+      "button": "Tugaskan"
+    },
+    "import": {
+      "button": "Impor order",
+      "title": "Impor order",
+      "description": "{{count}} baris terdeteksi di {{name}}. Petakan kolom ke field order.",
+      "run": "Impor sekarang",
+      "needOrderNumber": "Petakan kolom ke No. Order.",
+      "empty": "File kosong.",
+      "done": "Terimpor {{success}} · {{duplicates}} duplikat · {{failed}} gagal"
+    },
+    "toast": {
+      "assigned": "Order ditugaskan ke {{name}}",
+      "statusUpdated": "Status diperbarui."
+    }
+  },
+  "imports": {
+    "title": "Riwayat Sinkron",
+    "description": "Semua batch impor order beserta hasilnya.",
+    "empty": "Belum ada impor.",
+    "columns": {
+      "time": "Waktu",
+      "importedBy": "Diimpor oleh",
+      "filename": "File",
+      "total": "Total",
+      "success": "Sukses",
+      "failed": "Gagal",
+      "duplicates": "Duplikat",
+      "status": "Status"
     }
   },
   "errors": {

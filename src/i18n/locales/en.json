@@ -393,10 +393,14 @@
     },
     "items": {
       "dashboard": "Dashboard",
+      "orders": "Orders",
       "packing": "Packing",
       "scanning": "Scan Tracking",
       "returns": "Returns",
       "reports": "Reports",
+      "imports": "Sync History",
+      "stores": "Connected Stores",
+      "marketplace": "Marketplace Connections",
       "users": "Users",
       "settings": "Settings"
     },
@@ -446,6 +450,13 @@
       "title": "3 stations report scan mismatches",
       "body": "Pack Station 02 has 4 mismatched scans in the last hour. Review the audit trail to investigate.",
       "open": "Open scan log"
+    },
+    "kpisExt": {
+      "ordersWaiting": "Orders waiting",
+      "ordersAssigned": "Orders assigned",
+      "packedToday": "Orders packed today",
+      "connectedStores": "Connected stores",
+      "lastImport": "Last import"
     }
   },
   "packing": {
@@ -678,6 +689,106 @@
       "title": "Danger zone",
       "subtitle": "Permanently delete this workspace and all associated data.",
       "delete": "Delete workspace"
+    }
+  },
+  "stores": {
+    "title": "Connected Stores",
+    "description": "Manage marketplace storefronts connected to this workspace.",
+    "add": "Add store",
+    "empty": "No stores connected yet.",
+    "columns": {
+      "store": "Store",
+      "marketplace": "Marketplace",
+      "storeStatus": "Store status",
+      "connection": "Connection",
+      "lastSync": "Last sync",
+      "created": "Created"
+    },
+    "dialog": {
+      "title": "Add a connected store",
+      "name": "Store name",
+      "marketplace": "Marketplace",
+      "save": "Save store"
+    },
+    "toast": {
+      "added": "Store added.",
+      "connected": "Store connected.",
+      "disconnected": "Store disconnected.",
+      "synced": "Sync triggered."
+    }
+  },
+  "marketplace": {
+    "title": "Marketplace Connections",
+    "description": "Connect Shopee, TikTok Shop, Tokopedia, Lazada and Blibli. Mock for now — OAuth integration coming soon.",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "sync": "Sync now",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "lastSync": "Last sync",
+    "storesCount": "{{count}} store(s) linked",
+    "noStores": "No stores linked"
+  },
+  "orders": {
+    "title": "Orders",
+    "description": "All marketplace orders, packing status and assignments.",
+    "searchPlaceholder": "Search order, tracking, customer…",
+    "empty": "No orders yet. Import a file or seed demo data.",
+    "filters": {
+      "allMarketplaces": "All marketplaces",
+      "allStores": "All stores",
+      "allStatuses": "All statuses"
+    },
+    "columns": {
+      "order": "Order #",
+      "marketplace": "Marketplace",
+      "store": "Store",
+      "customer": "Customer",
+      "tracking": "Tracking #",
+      "courier": "Courier",
+      "packing": "Packing",
+      "assigned": "Assigned",
+      "created": "Created"
+    },
+    "status": {
+      "waiting": "Waiting",
+      "assigned": "Assigned",
+      "packing": "Packing",
+      "packed": "Packed",
+      "shipped": "Shipped"
+    },
+    "assign": {
+      "label": "Assign to packer",
+      "placeholder": "Select packer",
+      "button": "Assign"
+    },
+    "import": {
+      "button": "Import orders",
+      "title": "Import orders",
+      "description": "{{count}} rows detected in {{name}}. Map columns to order fields.",
+      "run": "Import now",
+      "needOrderNumber": "Map a column to Order #.",
+      "empty": "The file is empty.",
+      "done": "Imported {{success}} · {{duplicates}} duplicates · {{failed}} failed"
+    },
+    "toast": {
+      "assigned": "Order assigned to {{name}}",
+      "statusUpdated": "Status updated."
+    }
+  },
+  "imports": {
+    "title": "Sync History",
+    "description": "All order import batches and their results.",
+    "empty": "No imports yet.",
+    "columns": {
+      "time": "Time",
+      "importedBy": "Imported by",
+      "filename": "File",
+      "total": "Total",
+      "success": "Success",
+      "failed": "Failed",
+      "duplicates": "Duplicates",
+      "status": "Status"
     }
   },
   "errors": {

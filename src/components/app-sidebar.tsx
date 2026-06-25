@@ -8,6 +8,10 @@ import {
   Users,
   Settings,
   Boxes,
+  Store,
+  ShoppingCart,
+  Plug,
+  History,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -34,6 +38,7 @@ export function AppSidebar() {
 
   const operations = [
     { title: t("sidebar.items.dashboard"), url: "/dashboard", icon: LayoutDashboard },
+    { title: t("sidebar.items.orders"), url: "/orders", icon: ShoppingCart },
     { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck },
     { title: t("sidebar.items.scanning"), url: "/scanning", icon: ScanLine },
     { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw },
@@ -41,9 +46,12 @@ export function AppSidebar() {
 
   const insights = [
     { title: t("sidebar.items.reports"), url: "/reports", icon: BarChart3 },
+    { title: t("sidebar.items.imports"), url: "/imports", icon: History },
   ];
 
   const admin = [
+    { title: t("sidebar.items.stores"), url: "/stores", icon: Store },
+    { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug },
     { title: t("sidebar.items.users"), url: "/users", icon: Users },
     { title: t("sidebar.items.settings"), url: "/settings", icon: Settings },
   ];
