@@ -791,13 +791,6 @@
       "status": "Status"
     }
   },
-  "dashboard.kpisExt": {
-    "ordersWaiting": "Orders waiting",
-    "ordersAssigned": "Orders assigned",
-    "packedToday": "Orders packed today",
-    "connectedStores": "Connected stores",
-    "lastImport": "Last import"
-  },
   "errors": {
     "pageNotFound": "Page not found",
     "pageNotFoundDesc": "The page you're looking for doesn't exist or has been moved.",
