@@ -81,8 +81,9 @@ function LoginPage() {
               <Label htmlFor="email">Work email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
-                defaultValue="alex@flowops.io"
+                defaultValue=""
                 placeholder="you@company.com"
               />
             </div>
@@ -96,7 +97,7 @@ function LoginPage() {
                   Forgot?
                 </button>
               </div>
-              <Input id="password" type="password" defaultValue="••••••••" />
+              <Input id="password" name="password" type="password" defaultValue="" />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in…" : "Sign in"}
