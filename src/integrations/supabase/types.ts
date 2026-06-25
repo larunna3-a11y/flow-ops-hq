@@ -201,27 +201,42 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          address: string | null
           created_at: string
+          currency: string
           id: string
+          language: string
+          logo_url: string | null
           name: string
           owner_id: string | null
           slug: string
+          timezone: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          currency?: string
           id?: string
+          language?: string
+          logo_url?: string | null
           name: string
           owner_id?: string | null
           slug: string
+          timezone?: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
+          currency?: string
           id?: string
+          language?: string
+          logo_url?: string | null
           name?: string
           owner_id?: string | null
           slug?: string
+          timezone?: string
           updated_at?: string
         }
         Relationships: []
