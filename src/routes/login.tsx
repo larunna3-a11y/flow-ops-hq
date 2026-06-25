@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Boxes } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -22,10 +24,26 @@ function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const data = new FormData(e.currentTarget as HTMLFormElement);
+    const email = String(data.get("email") || "").trim();
+    const password = String(data.get("password") || "");
+
+    if (!email || !password) {
+      toast.error("Enter your email and password.");
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => navigate({ to: "/dashboard" }), 400);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message || "Invalid credentials.");
+      return;
+    }
+    navigate({ to: "/dashboard" });
   };
 
   return (
