@@ -246,22 +246,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      current_workspace_id: { Args: never; Returns: string }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_member_of: {
-        Args: { _user_id: string; _workspace_id: string }
-        Returns: boolean
-      }
-      is_workspace_owner: {
-        Args: { _user_id: string; _workspace_id: string }
-        Returns: boolean
-      }
+      [_ in never]: never
     }
     Enums: {
       app_role: "Owner" | "Supervisor" | "Packer" | "Return Staff"
