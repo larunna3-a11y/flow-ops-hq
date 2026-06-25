@@ -59,9 +59,13 @@ function DashboardPage() {
   const qc = useQueryClient();
   const ws = useWorkspace();
   const seed = useServerFn(seedDemoData);
+  const seedS2 = useServerFn(seedSprint2);
   const records = usePackingRecords();
   const returns = useReturns();
   const activity = useAuditLogs(8);
+  const orders = useOrders();
+  const stores = useStores();
+  const imports = useImports();
 
   // Auto-seed demo data for owners on first visit if empty.
   useEffect(() => {
