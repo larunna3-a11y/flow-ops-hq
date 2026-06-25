@@ -12,7 +12,6 @@ import {
   ShoppingCart,
   Plug,
   History,
-  Zap,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -54,7 +53,6 @@ export function AppSidebar() {
     { title: t("sidebar.items.stores"), url: "/stores", icon: Store },
     { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug },
     { title: t("sidebar.items.users"), url: "/users", icon: Users },
-    { title: "Automation", url: "/automation", icon: Zap },
     { title: t("sidebar.items.settings"), url: "/settings", icon: Settings },
   ];
 
