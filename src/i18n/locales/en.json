@@ -579,6 +579,7 @@
     "title": "User management",
     "description": "Owner-only. Invite teammates and assign roles for warehouse operations.",
     "invite": "Invite member",
+    "empty": "No members yet.",
     "dialog": {
       "title": "Invite a teammate",
       "description": "They'll receive an email invitation to join your workspace. No public sign-up is allowed.",
@@ -594,9 +595,19 @@
       "status": "Status",
       "lastActive": "Last active"
     },
+    "invitations": {
+      "title": "Invitations",
+      "empty": "No invitations yet.",
+      "columns": { "email": "Email", "expires": "Expires" }
+    },
     "actions": {
-      "changeRole": "Change role",
+      "makeRole": "Make {{role}}",
       "resend": "Resend invite",
+      "revoke": "Revoke invitation",
+      "resetPassword": "Send password reset",
+      "deactivate": "Deactivate user",
+      "activate": "Reactivate user",
+      "changeRole": "Change role",
       "remove": "Remove from workspace"
     },
     "toast": {
@@ -604,7 +615,15 @@
       "mustSignIn": "You must be signed in.",
       "noWorkspace": "No workspace found for your account.",
       "ownerOnly": "Only Owners can invite members.",
-      "sent": "Invitation sent to {{email}}"
+      "alreadyMember": "This email already belongs to a workspace member.",
+      "alreadyInvited": "An invitation is already pending for this email.",
+      "sent": "Invitation sent to {{email}}",
+      "resent": "Invitation refreshed for {{email}}",
+      "revoked": "Invitation revoked.",
+      "roleChanged": "Role updated.",
+      "deactivated": "User deactivated.",
+      "activated": "User reactivated.",
+      "resetSent": "Password reset email sent to {{email}}"
     }
   },
   "settings": {
@@ -613,8 +632,21 @@
     "workspace": {
       "title": "Workspace",
       "subtitle": "Only Owners can edit workspace details.",
-      "name": "Workspace name",
-      "slug": "URL slug"
+      "subtitleOwner": "Edit your company profile, regional preferences and branding.",
+      "name": "Company name",
+      "slug": "URL slug",
+      "address": "Company address",
+      "addressPlaceholder": "Jl. Sudirman No. 1, Jakarta",
+      "timezone": "Timezone",
+      "language": "Default language",
+      "currency": "Currency",
+      "logo": "Company logo",
+      "logoHint": "Square PNG or JPG, max 2 MB.",
+      "uploadLogo": "Upload logo",
+      "logoUploaded": "Logo updated.",
+      "logoTooBig": "Logo must be 2 MB or smaller.",
+      "nameRequired": "Company name is required.",
+      "saved": "Workspace updated."
     },
     "appearance": {
       "title": "Appearance",
@@ -626,24 +658,28 @@
       "title": "Notifications",
       "subtitle": "Decide what alerts your team receives.",
       "items": {
-        "scanMismatch": {
-          "title": "Scan mismatch alerts",
-          "desc": "Notify supervisors when a station has more than 3 mismatches in an hour."
-        },
-        "slaBreach": {
-          "title": "SLA breach warnings",
-          "desc": "Alert when packing times exceed station targets."
-        },
-        "dailySummary": {
-          "title": "Daily summary email",
-          "desc": "Receive a digest of yesterday's operations every morning."
-        }
+        "scanMismatch": { "title": "Scan mismatch alerts", "desc": "Notify supervisors when a station has more than 3 mismatches in an hour." },
+        "slaBreach": { "title": "SLA breach warnings", "desc": "Alert when packing times exceed station targets." },
+        "dailySummary": { "title": "Daily summary email", "desc": "Receive a digest of yesterday's operations every morning." }
       }
     },
     "danger": {
       "title": "Danger zone",
       "subtitle": "Permanently delete this workspace and all associated data.",
       "delete": "Delete workspace"
+    }
+  },
+  "auth": {
+    "reset": {
+      "title": "Set a new password",
+      "subtitle": "Choose a strong password for your FlowOps account.",
+      "newPassword": "New password",
+      "confirm": "Confirm password",
+      "submit": "Update password",
+      "success": "Password updated. You're signed in.",
+      "weak": "Password must be at least 8 characters.",
+      "mismatch": "Passwords don't match.",
+      "waiting": "Open this page from the password reset email link to continue."
     }
   },
   "errors": {
