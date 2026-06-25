@@ -2,10 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, Boxes, Check, ShieldCheck, Users, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
@@ -23,6 +25,7 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +38,7 @@ function SignupPage() {
     const password = String(data.get("new-password") || "");
 
     if (!workspaceName || !fullName || !email || password.length < 8) {
-      toast.error("Please complete every field (password ≥ 8 characters).");
+      toast.error(t("auth.errors.completeFields"));
       return;
     }
 
@@ -51,62 +54,67 @@ function SignupPage() {
     setLoading(false);
 
     if (error) {
-      // Surfaces the trigger's "invitation required" message after first workspace exists.
-      toast.error(error.message || "Could not create workspace.");
+      toast.error(error.message || t("auth.errors.couldNotCreate"));
       return;
     }
-    toast.success("Workspace created. Welcome aboard!");
+    toast.success(t("auth.success.workspaceCreated"));
     navigate({ to: "/dashboard" });
   };
+
+  const pitchKeys = ["live", "invite", "secure", "free"] as const;
+  const pitchIcons = { live: Zap, invite: Users, secure: ShieldCheck, free: Check };
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       {/* Left — form */}
       <div className="flex flex-col px-6 py-8 sm:px-10">
-        <Link to="/" className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-elegant">
-            <Boxes className="h-4 w-4" />
-          </div>
-          <span className="text-base font-semibold tracking-tight">FlowOps</span>
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-elegant">
+              <Boxes className="h-4 w-4" />
+            </div>
+            <span className="text-base font-semibold tracking-tight">FlowOps</span>
+          </Link>
+          <LanguageSwitcher variant="marketing" />
+        </div>
 
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12">
-          <h1 className="text-2xl font-semibold tracking-tight">Create your workspace</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("auth.signup.title")}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            The first registered user becomes the workspace Owner.
+            {t("auth.signup.subtitle")}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="ws-name">Workspace name</Label>
-              <Input id="ws-name" name="ws-name" placeholder="Northwind Logistics" />
+              <Label htmlFor="ws-name">{t("auth.signup.workspaceName")}</Label>
+              <Input id="ws-name" name="ws-name" placeholder={t("auth.signup.workspaceNamePlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="owner-name">Your name</Label>
-              <Input id="owner-name" name="owner-name" placeholder="Alex Morgan" />
+              <Label htmlFor="owner-name">{t("auth.signup.yourName")}</Label>
+              <Input id="owner-name" name="owner-name" placeholder={t("auth.signup.yourNamePlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="owner-email">Work email</Label>
-              <Input id="owner-email" name="owner-email" type="email" placeholder="you@company.com" />
+              <Label htmlFor="owner-email">{t("auth.signup.email")}</Label>
+              <Input id="owner-email" name="owner-email" type="email" placeholder={t("auth.signup.emailPlaceholder")} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="new-password">Create password</Label>
-              <Input id="new-password" name="new-password" type="password" placeholder="At least 8 characters" />
+              <Label htmlFor="new-password">{t("auth.signup.password")}</Label>
+              <Input id="new-password" name="new-password" type="password" placeholder={t("auth.signup.passwordPlaceholder")} />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating workspace…" : "Create workspace as Owner"}
+              {loading ? t("common.creating") : t("auth.signup.submit")}
               <ArrowRight className="ml-1.5 h-4 w-4" />
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              Already have an account?{" "}
+              {t("auth.signup.alreadyHave")}{" "}
               <Link to="/login" className="font-medium text-primary hover:underline">
-                Sign in
+                {t("auth.signup.signIn")}
               </Link>
             </p>
           </form>
         </div>
 
-        <p className="text-xs text-muted-foreground">© FlowOps {new Date().getFullYear()}</p>
+        <p className="text-xs text-muted-foreground">{t("auth.signup.copyright", { year: new Date().getFullYear() })}</p>
       </div>
 
       {/* Right — pitch */}
@@ -116,33 +124,31 @@ function SignupPage() {
 
         <div className="relative">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-xs font-medium backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-white" /> Warehouse Operations
+            <span className="h-1.5 w-1.5 rounded-full bg-white" /> {t("auth.signup.pitchBadge")}
           </div>
           <h2 className="mt-8 max-w-md text-3xl font-semibold leading-tight tracking-tight">
-            Pack faster, ship cleaner, return smarter.
+            {t("auth.signup.pitchTitle")}
           </h2>
           <p className="mt-4 max-w-md text-sm text-primary-foreground/85">
-            Join operations teams running their entire warehouse on a single workspace.
+            {t("auth.signup.pitchSubtitle")}
           </p>
         </div>
 
         <div className="relative space-y-4">
-          {[
-            { icon: Zap, title: "Live in minutes", desc: "No installation, no setup calls." },
-            { icon: Users, title: "Invite your team", desc: "Owner, Supervisor, Packer, Returns." },
-            { icon: ShieldCheck, title: "Secure by default", desc: "Role-based access on every action." },
-            { icon: Check, title: "Free to start", desc: "Upgrade when your team is ready." },
-          ].map((f) => (
-            <div key={f.title} className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/25 bg-white/10 backdrop-blur">
-                <f.icon className="h-4 w-4" />
+          {pitchKeys.map((k) => {
+            const Icon = pitchIcons[k];
+            return (
+              <div key={k} className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-white/25 bg-white/10 backdrop-blur">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{t(`auth.signup.pitch.${k}.title`)}</div>
+                  <div className="text-xs text-primary-foreground/80">{t(`auth.signup.pitch.${k}.desc`)}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-sm font-semibold">{f.title}</div>
-                <div className="text-xs text-primary-foreground/80">{f.desc}</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

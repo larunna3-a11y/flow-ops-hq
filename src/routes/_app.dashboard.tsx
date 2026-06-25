@@ -2,8 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   Legend,
@@ -23,6 +21,7 @@ import {
   AlertTriangle,
   ArrowRight,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusPill, statusToTone } from "@/components/status-pill";
@@ -47,35 +46,36 @@ export const Route = createFileRoute("/_app/dashboard")({
 const pieColors = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function DashboardPage() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Operational overview"
-        description="Live snapshot of packing, scanning and returns across your workspace."
+        title={t("dashboard.title")}
+        description={t("dashboard.description")}
         actions={
           <>
-            <Button variant="outline" size="sm">Last 7 days</Button>
-            <Button size="sm">Export report</Button>
+            <Button variant="outline" size="sm">{t("common.last7Days")}</Button>
+            <Button size="sm">{t("common.exportReport")}</Button>
           </>
         }
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Packed today" value="472" delta={12} hint="Target: 400" icon={<PackageCheck className="h-4 w-4" />} />
-        <StatCard label="Scans logged" value="3,182" delta={4} hint="Across 6 stations" icon={<ScanLine className="h-4 w-4" />} />
-        <StatCard label="Returns received" value="38" delta={-6} hint="18 awaiting inspection" icon={<RotateCcw className="h-4 w-4" />} />
-        <StatCard label="On-time ship rate" value="94.2%" delta={2} hint="Across 4 couriers" icon={<Truck className="h-4 w-4" />} />
+        <StatCard label={t("dashboard.kpis.packedToday")} value="472" delta={12} hint={t("dashboard.kpis.packedHint")} icon={<PackageCheck className="h-4 w-4" />} />
+        <StatCard label={t("dashboard.kpis.scansLogged")} value="3,182" delta={4} hint={t("dashboard.kpis.scansHint")} icon={<ScanLine className="h-4 w-4" />} />
+        <StatCard label={t("dashboard.kpis.returnsReceived")} value="38" delta={-6} hint={t("dashboard.kpis.returnsHint")} icon={<RotateCcw className="h-4 w-4" />} />
+        <StatCard label={t("dashboard.kpis.onTimeShip")} value="94.2%" delta={2} hint={t("dashboard.kpis.onTimeHint")} icon={<Truck className="h-4 w-4" />} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-lg border bg-card p-5 shadow-card">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Packing performance</h3>
-              <p className="text-xs text-muted-foreground">Daily packed orders vs. target</p>
+              <h3 className="text-sm font-semibold text-foreground">{t("dashboard.performance.title")}</h3>
+              <p className="text-xs text-muted-foreground">{t("dashboard.performance.subtitle")}</p>
             </div>
             <span className="inline-flex items-center gap-1.5 text-xs text-success">
-              <TrendingUp className="h-3.5 w-3.5" /> +18% this week
+              <TrendingUp className="h-3.5 w-3.5" /> {t("dashboard.performance.trend")}
             </span>
           </div>
           <div className="mt-4 h-64">
@@ -107,8 +107,8 @@ function DashboardPage() {
         </div>
 
         <div className="rounded-lg border bg-card p-5 shadow-card">
-          <h3 className="text-sm font-semibold text-foreground">Marketplace mix</h3>
-          <p className="text-xs text-muted-foreground">Orders by channel (30d)</p>
+          <h3 className="text-sm font-semibold text-foreground">{t("dashboard.marketplaceMix.title")}</h3>
+          <p className="text-xs text-muted-foreground">{t("dashboard.marketplaceMix.subtitle")}</p>
           <div className="mt-2 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -139,11 +139,11 @@ function DashboardPage() {
         <div className="lg:col-span-2 rounded-lg border bg-card shadow-card">
           <div className="flex items-center justify-between border-b px-5 py-3">
             <div>
-              <h3 className="text-sm font-semibold">Live packing queue</h3>
-              <p className="text-xs text-muted-foreground">Latest orders flowing through stations</p>
+              <h3 className="text-sm font-semibold">{t("dashboard.queue.title")}</h3>
+              <p className="text-xs text-muted-foreground">{t("dashboard.queue.subtitle")}</p>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link to="/packing">Open queue <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+              <Link to="/packing">{t("dashboard.queue.open")} <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
             </Button>
           </div>
           <div className="divide-y">
@@ -151,8 +151,10 @@ function DashboardPage() {
               <div key={o.id} className="flex items-center gap-4 px-5 py-3 text-sm">
                 <div className="font-mono text-xs text-muted-foreground w-20">{o.orderNumber}</div>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate font-medium">{o.marketplace} · {o.items} items</div>
-                  <div className="text-xs text-muted-foreground">{o.packer ? `Packer: ${o.packer}` : "Unassigned"} · {o.createdAt}</div>
+                  <div className="truncate font-medium">{o.marketplace} · {t("dashboard.queue.items", { count: o.items })}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {o.packer ? t("dashboard.queue.packerLabel", { name: o.packer }) : t("common.unassigned")} · {o.createdAt}
+                  </div>
                 </div>
                 <StatusPill tone={statusToTone(o.status)}>{o.status.replace("_", " ")}</StatusPill>
               </div>
@@ -162,9 +164,9 @@ function DashboardPage() {
 
         <div className="rounded-lg border bg-card shadow-card">
           <div className="flex items-center justify-between border-b px-5 py-3">
-            <h3 className="text-sm font-semibold">User activity</h3>
+            <h3 className="text-sm font-semibold">{t("dashboard.activity.title")}</h3>
             <Button asChild variant="ghost" size="sm">
-              <Link to="/users">Team <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+              <Link to="/users">{t("dashboard.activity.team")} <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
             </Button>
           </div>
           <ul className="divide-y">
@@ -188,13 +190,13 @@ function DashboardPage() {
             <AlertTriangle className="h-4 w-4" />
           </div>
           <div className="flex-1">
-            <div className="text-sm font-semibold">3 stations report scan mismatches</div>
+            <div className="text-sm font-semibold">{t("dashboard.alert.title")}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Pack Station 02 has 4 mismatched scans in the last hour. Review the audit trail to investigate.
+              {t("dashboard.alert.body")}
             </div>
           </div>
           <Button asChild size="sm" variant="outline">
-            <Link to="/scanning">Open scan log</Link>
+            <Link to="/scanning">{t("dashboard.alert.open")}</Link>
           </Button>
         </div>
       </div>

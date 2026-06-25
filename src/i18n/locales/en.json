@@ -1,0 +1,655 @@
+{
+  "common": {
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "export": "Export",
+    "exportCsv": "Export CSV",
+    "exportReport": "Export report",
+    "exportLog": "Export log",
+    "filters": "Filters",
+    "loading": "Loading…",
+    "sending": "Sending…",
+    "signingIn": "Signing in…",
+    "creating": "Creating workspace…",
+    "last7Days": "Last 7 days",
+    "last30Days": "Last 30 days",
+    "updatedJustNow": "Updated just now",
+    "all": "All",
+    "active": "active",
+    "pending": "pending",
+    "unassigned": "Unassigned",
+    "members": "members",
+    "tryAgain": "Try again",
+    "goHome": "Go home"
+  },
+  "language": {
+    "switch": "Language",
+    "english": "English",
+    "indonesian": "Bahasa Indonesia"
+  },
+  "nav": {
+    "home": "Home",
+    "features": "Features",
+    "pricing": "Pricing",
+    "login": "Login",
+    "getStarted": "Get started",
+    "toggleMenu": "Toggle menu",
+    "toggleTheme": "Toggle theme",
+    "notifications": "Notifications"
+  },
+  "footer": {
+    "tagline": "Warehouse operations for modern e-commerce and marketplace teams.",
+    "product": "Product",
+    "solutions": "Solutions",
+    "company": "Company",
+    "ecommerceBrands": "E-commerce brands",
+    "marketplaceSellers": "Marketplace sellers",
+    "warehouseTeams": "Warehouse teams",
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy",
+    "rights": "© {{year}} FlowOps. All rights reserved.",
+    "builtFor": "Built for warehouses that ship."
+  },
+  "landing": {
+    "hero": {
+      "badge": "New — Real-time packing analytics",
+      "titleLead": "Warehouse operations,",
+      "titleAccent": "finally in flow.",
+      "subtitle": "FlowOps unifies packing, scanning, returns and reporting in a single workspace built for e-commerce brands, marketplace sellers and warehouse teams.",
+      "ctaPrimary": "Start free",
+      "ctaSecondary": "See how it works",
+      "footnote": "No credit card required · Invite-only workspace · Cancel anytime",
+      "previewUrl": "app.flowops.io/dashboard",
+      "stat1": "Orders packed",
+      "stat2": "Avg pack time",
+      "stat3": "Return rate",
+      "deltaUp": "+12%",
+      "deltaDown1": "-8%",
+      "deltaDown2": "-0.4%",
+      "deltaVsLastWeek": "vs last week",
+      "throughput": "Packing throughput"
+    },
+    "logos": {
+      "trustedBy": "Trusted by operations teams shipping millions of orders"
+    },
+    "overview": {
+      "eyebrow": "Product overview",
+      "title": "One workspace for every motion of your warehouse.",
+      "body": "FlowOps replaces the spreadsheets, sticky notes and disconnected tools your team uses to pack, scan and process returns. Everything flows into the same operational record, visible to owners, supervisors, packers and return staff.",
+      "bullets": [
+        "Live packing queue with SLA-aware prioritisation",
+        "Barcode and QR scan audit trail (scanner-ready)",
+        "Return inspection workflow with resolution outcomes",
+        "Marketplace, courier and user productivity reporting"
+      ],
+      "moduleLabels": {
+        "packing": "Packing Ops",
+        "scanning": "Scan Tracking",
+        "returns": "Returns",
+        "reports": "Reports"
+      },
+      "moduleHint": "Built-in module, ready on day one."
+    },
+    "features": {
+      "eyebrow": "Features",
+      "title": "Everything operations teams need, nothing they don't.",
+      "subtitle": "Built from the floor up for warehouses that ship — not adapted from a generic ERP.",
+      "items": {
+        "packing": {
+          "title": "Packing operations",
+          "desc": "Live queue, priority filters and per-packer performance, so the right order is always next."
+        },
+        "scanning": {
+          "title": "Barcode & QR tracking",
+          "desc": "Every scan event captured with timestamp, user and station — a complete audit trail."
+        },
+        "returns": {
+          "title": "Return management",
+          "desc": "RMA intake, inspection grading and resolution outcomes, all in one workflow."
+        },
+        "reports": {
+          "title": "Reports & analytics",
+          "desc": "Marketplace mix, courier KPIs and user productivity, refreshed in real time."
+        },
+        "rbac": {
+          "title": "Role-based access",
+          "desc": "Owner, Supervisor, Packer and Return Staff — scoped to what each role actually needs."
+        },
+        "invites": {
+          "title": "Workspace invites",
+          "desc": "First registered user becomes Owner. No public sign-up — invite only, by design."
+        }
+      }
+    },
+    "howItWorks": {
+      "eyebrow": "How it works",
+      "title": "From spreadsheet to shipping floor in under an hour.",
+      "step": "Step {{n}}",
+      "steps": {
+        "create": {
+          "title": "Create your workspace",
+          "desc": "Sign up in seconds. The first user becomes the workspace Owner."
+        },
+        "invite": {
+          "title": "Invite your team",
+          "desc": "Add Supervisors, Packers and Return Staff with role-based access."
+        },
+        "ship": {
+          "title": "Ship with confidence",
+          "desc": "Run packing, scanning and returns from one operational record."
+        }
+      }
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "title": "Simple pricing that scales with your shipping volume.",
+      "subtitle": "Start free. Upgrade when your team is ready.",
+      "mostPopular": "Most popular"
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title": "Frequently asked questions",
+      "items": [
+        {
+          "q": "Who is FlowOps for?",
+          "a": "Operations teams at e-commerce brands, marketplace sellers and 3PL warehouses that need to coordinate packing, scanning and returns in one place."
+        },
+        {
+          "q": "Can anyone sign up?",
+          "a": "The first registered user creates and owns a workspace. After that, new members join by invite only — there is no public sign-up into an existing workspace."
+        },
+        {
+          "q": "What roles are supported?",
+          "a": "Owner, Supervisor, Packer and Return Staff. Each role has scoped access to the modules and actions they need."
+        },
+        {
+          "q": "Does FlowOps support barcode scanners?",
+          "a": "Yes. The scan tracking module is scanner-ready and records every event with a full audit trail. Hardware integration is on the upcoming roadmap."
+        },
+        {
+          "q": "Which marketplaces do you integrate with?",
+          "a": "Marketplace integrations are on our near-term roadmap. Today you can import orders and run reporting on marketplace mix using mock or uploaded data."
+        },
+        {
+          "q": "Can I cancel anytime?",
+          "a": "Yes. Paid plans are month-to-month and can be cancelled from your workspace settings."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Ready to bring your warehouse into flow?",
+      "subtitle": "Create your workspace in under a minute. Invite your team. Start shipping smarter today.",
+      "primary": "Get started free",
+      "secondary": "I already have an account"
+    }
+  },
+  "features": {
+    "eyebrow": "Features",
+    "title": "Everything your warehouse needs in one workspace.",
+    "subtitle": "Six built-in modules that replace the spreadsheets, sticky notes and disconnected tools your team uses today.",
+    "ctaStart": "Start free",
+    "ctaPricing": "See pricing",
+    "modules": {
+      "packing": {
+        "title": "Packing operations",
+        "desc": "A live queue that surfaces the next order to pack with SLA-aware priority, per-packer performance and station context.",
+        "points": [
+          "Live order queue with priority filters",
+          "Per-packer throughput & accuracy",
+          "Station and shift context",
+          "SLA breach early warnings"
+        ]
+      },
+      "scanning": {
+        "title": "Barcode & QR scan tracking",
+        "desc": "Every scan event captured with timestamp, user, station and outcome — a complete operational audit trail.",
+        "points": [
+          "Scanner-ready event capture",
+          "Full audit trail by SKU and order",
+          "Mismatch & exception logging",
+          "Searchable scan history"
+        ]
+      },
+      "returns": {
+        "title": "Return management",
+        "desc": "From RMA intake to inspection grading to resolution — the entire return lifecycle in one workflow.",
+        "points": [
+          "RMA intake & customer context",
+          "Inspection grading & photos",
+          "Refund / restock / discard outcomes",
+          "Return rate analytics"
+        ]
+      },
+      "reports": {
+        "title": "Reporting & analytics",
+        "desc": "Marketplace mix, courier KPIs and user productivity reporting — refreshed in real time.",
+        "points": [
+          "Marketplace mix & volume",
+          "Courier SLA & cost reports",
+          "User productivity dashboards",
+          "Export to CSV"
+        ]
+      },
+      "rbac": {
+        "title": "Role-based access",
+        "desc": "Owner, Supervisor, Packer and Return Staff — each role scoped to the modules and actions they need.",
+        "points": [
+          "Four built-in roles",
+          "Workspace-level isolation",
+          "Granular module access",
+          "Audit log of admin actions"
+        ]
+      },
+      "invites": {
+        "title": "Workspace & invites",
+        "desc": "First registered user becomes Owner. After that, members join by invite only — no public sign-up.",
+        "points": [
+          "Single workspace per account",
+          "Owner-controlled invites",
+          "Email-based onboarding",
+          "Member status & deactivation"
+        ]
+      }
+    }
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "Simple pricing that scales with your shipping volume.",
+    "subtitle": "Start free. Upgrade when your team is ready. No hidden fees.",
+    "mostPopular": "Most popular",
+    "compareTitle": "Compare plans",
+    "compareFeature": "Feature",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "price": "$0",
+        "cadence": "/mo",
+        "desc": "For small teams getting set up.",
+        "cta": "Start free",
+        "features": [
+          "1 workspace",
+          "Up to 3 users",
+          "Packing & scanning modules",
+          "Basic reports",
+          "Community support"
+        ]
+      },
+      "growth": {
+        "name": "Growth",
+        "price": "$49",
+        "cadence": "/mo",
+        "desc": "For scaling e-commerce operations.",
+        "cta": "Start 14-day trial",
+        "features": [
+          "Unlimited users",
+          "All operations modules",
+          "Advanced analytics",
+          "Return workflows",
+          "Priority email support"
+        ]
+      },
+      "scale": {
+        "name": "Scale",
+        "price": "Custom",
+        "cadence": "",
+        "desc": "For multi-warehouse operations.",
+        "cta": "Contact sales",
+        "features": [
+          "Multi-warehouse",
+          "SSO & audit logs",
+          "Dedicated CSM",
+          "Custom integrations",
+          "99.9% uptime SLA"
+        ]
+      }
+    },
+    "compare": {
+      "users": "Users",
+      "packingScanning": "Packing & Scanning",
+      "returns": "Return management",
+      "analytics": "Advanced analytics",
+      "multiWarehouse": "Multi-warehouse",
+      "sso": "SSO & audit logs",
+      "support": "Support",
+      "values": {
+        "unlimited": "Unlimited",
+        "included": "Included",
+        "none": "—",
+        "community": "Community",
+        "priorityEmail": "Priority email",
+        "dedicatedCsm": "Dedicated CSM"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "Sign in to your FlowOps workspace.",
+      "email": "Work email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Password",
+      "forgot": "Forgot?",
+      "submit": "Sign in",
+      "newHere": "New here?",
+      "createWorkspace": "Create a workspace",
+      "noPublicSignup": "No public sign-up. New members join by invite only."
+    },
+    "signup": {
+      "title": "Create your workspace",
+      "subtitle": "The first registered user becomes the workspace Owner.",
+      "workspaceName": "Workspace name",
+      "workspaceNamePlaceholder": "Northwind Logistics",
+      "yourName": "Your name",
+      "yourNamePlaceholder": "Alex Morgan",
+      "email": "Work email",
+      "emailPlaceholder": "you@company.com",
+      "password": "Create password",
+      "passwordPlaceholder": "At least 8 characters",
+      "submit": "Create workspace as Owner",
+      "alreadyHave": "Already have an account?",
+      "signIn": "Sign in",
+      "copyright": "© FlowOps {{year}}",
+      "pitchBadge": "Warehouse Operations",
+      "pitchTitle": "Pack faster, ship cleaner, return smarter.",
+      "pitchSubtitle": "Join operations teams running their entire warehouse on a single workspace.",
+      "pitch": {
+        "live": { "title": "Live in minutes", "desc": "No installation, no setup calls." },
+        "invite": { "title": "Invite your team", "desc": "Owner, Supervisor, Packer, Returns." },
+        "secure": { "title": "Secure by default", "desc": "Role-based access on every action." },
+        "free": { "title": "Free to start", "desc": "Upgrade when your team is ready." }
+      }
+    },
+    "errors": {
+      "completeFields": "Please complete every field (password ≥ 8 characters).",
+      "missingCredentials": "Enter your email and password.",
+      "invalidCredentials": "Invalid credentials.",
+      "couldNotCreate": "Could not create workspace.",
+      "genericAuth": "Something went wrong. Try again."
+    },
+    "success": {
+      "workspaceCreated": "Workspace created. Welcome aboard!"
+    }
+  },
+  "sidebar": {
+    "groups": {
+      "operations": "Operations",
+      "insights": "Insights",
+      "workspace": "Workspace"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "packing": "Packing",
+      "scanning": "Scan Tracking",
+      "returns": "Returns",
+      "reports": "Reports",
+      "users": "Users",
+      "settings": "Settings"
+    },
+    "plan": "{{plan}} plan",
+    "membersCount": "{{count}} members"
+  },
+  "topbar": {
+    "searchPlaceholder": "Search orders, RMAs, users…",
+    "settings": "Settings",
+    "team": "Team",
+    "signOut": "Sign out"
+  },
+  "dashboard": {
+    "title": "Operational overview",
+    "description": "Live snapshot of packing, scanning and returns across your workspace.",
+    "kpis": {
+      "packedToday": "Packed today",
+      "packedHint": "Target: 400",
+      "scansLogged": "Scans logged",
+      "scansHint": "Across 6 stations",
+      "returnsReceived": "Returns received",
+      "returnsHint": "18 awaiting inspection",
+      "onTimeShip": "On-time ship rate",
+      "onTimeHint": "Across 4 couriers"
+    },
+    "performance": {
+      "title": "Packing performance",
+      "subtitle": "Daily packed orders vs. target",
+      "trend": "+18% this week"
+    },
+    "marketplaceMix": {
+      "title": "Marketplace mix",
+      "subtitle": "Orders by channel (30d)"
+    },
+    "queue": {
+      "title": "Live packing queue",
+      "subtitle": "Latest orders flowing through stations",
+      "open": "Open queue",
+      "items": "{{count}} items",
+      "packerLabel": "Packer: {{name}}"
+    },
+    "activity": {
+      "title": "User activity",
+      "team": "Team"
+    },
+    "alert": {
+      "title": "3 stations report scan mismatches",
+      "body": "Pack Station 02 has 4 mismatched scans in the last hour. Review the audit trail to investigate.",
+      "open": "Open scan log"
+    }
+  },
+  "packing": {
+    "title": "Packing operations",
+    "description": "Live queue, station throughput and packer assignments.",
+    "newTask": "New pack task",
+    "kpis": {
+      "inQueue": "In queue",
+      "inQueueHint": "High priority: 18",
+      "activePackers": "Active packers",
+      "activePackersHint": "Across 4 stations",
+      "avgTime": "Avg. pack time",
+      "avgTimeHint": "Target: 2m 30s",
+      "accuracy": "Today's accuracy",
+      "accuracyHint": "Scan-verified"
+    },
+    "tabs": {
+      "all": "All",
+      "queued": "Queued",
+      "inProgress": "In progress",
+      "packed": "Packed",
+      "shipped": "Shipped"
+    },
+    "searchPlaceholder": "Search by order #",
+    "columns": {
+      "order": "Order",
+      "marketplace": "Marketplace",
+      "items": "Items",
+      "courier": "Courier",
+      "packer": "Packer",
+      "priority": "Priority",
+      "status": "Status",
+      "created": "Created"
+    },
+    "priority": {
+      "high": "high",
+      "normal": "normal",
+      "low": "low"
+    },
+    "status": {
+      "queued": "queued",
+      "in_progress": "in progress",
+      "packed": "packed",
+      "shipped": "shipped"
+    }
+  },
+  "scanning": {
+    "title": "Barcode & QR scan tracking",
+    "description": "Every scan across pack stations and returns bays, fully audited.",
+    "connectScanner": "Connect scanner",
+    "kpis": {
+      "scansToday": "Scans today",
+      "scansHint": "Barcodes + QR",
+      "matchRate": "Match rate",
+      "matchHint": "Last 24h",
+      "mismatches": "Mismatches",
+      "mismatchHint": "Awaiting review",
+      "activeStations": "Active stations",
+      "stationHint": "2 offline"
+    },
+    "notice": {
+      "title": "Scanner hardware not connected yet",
+      "body": "This module shows the audit trail UI. Live barcode capture will be enabled in the next release."
+    },
+    "recent": "Recent scans",
+    "columns": {
+      "time": "Time",
+      "type": "Type",
+      "code": "Code",
+      "order": "Order",
+      "station": "Station",
+      "scannedBy": "Scanned by",
+      "result": "Result"
+    }
+  },
+  "returns": {
+    "title": "Return management",
+    "description": "Track RMAs through inspection, restocking and rejection.",
+    "newRma": "New RMA",
+    "kpis": {
+      "open": "Open returns",
+      "openHint": "18 awaiting inspection",
+      "restocked": "Restocked (7d)",
+      "rejected": "Rejected (7d)",
+      "returnRate": "Return rate",
+      "rateHint": "Of shipped orders"
+    },
+    "tabs": {
+      "all": "All",
+      "received": "Received",
+      "inspecting": "Inspecting",
+      "restocked": "Restocked",
+      "rejected": "Rejected"
+    },
+    "columns": {
+      "rma": "RMA",
+      "order": "Order",
+      "marketplace": "Marketplace",
+      "reason": "Reason",
+      "assigned": "Assigned",
+      "received": "Received",
+      "status": "Status"
+    }
+  },
+  "reports": {
+    "title": "Reporting & analytics",
+    "description": "Marketplace performance, courier KPIs and packer productivity.",
+    "tabs": {
+      "marketplaces": "Marketplaces",
+      "couriers": "Couriers",
+      "productivity": "User productivity"
+    },
+    "marketplaces": {
+      "chartTitle": "Orders vs. returns by marketplace",
+      "columns": {
+        "marketplace": "Marketplace",
+        "orders": "Orders",
+        "returns": "Returns",
+        "returnRate": "Return rate"
+      }
+    },
+    "couriers": {
+      "chartTitle": "On-time delivery rate by courier",
+      "columns": {
+        "courier": "Courier",
+        "shipments": "Shipments",
+        "onTime": "On-time %"
+      }
+    },
+    "productivity": {
+      "chartTitle": "Weekly packed volume trend",
+      "columns": {
+        "user": "User",
+        "role": "Role",
+        "packed": "Items packed",
+        "accuracy": "Accuracy",
+        "hours": "Hours"
+      }
+    }
+  },
+  "users": {
+    "title": "User management",
+    "description": "Owner-only. Invite teammates and assign roles for warehouse operations.",
+    "invite": "Invite member",
+    "dialog": {
+      "title": "Invite a teammate",
+      "description": "They'll receive an email invitation to join your workspace. No public sign-up is allowed.",
+      "email": "Work email",
+      "emailPlaceholder": "name@company.com",
+      "role": "Role",
+      "send": "Send invite"
+    },
+    "searchPlaceholder": "Search members",
+    "columns": {
+      "member": "Member",
+      "role": "Role",
+      "status": "Status",
+      "lastActive": "Last active"
+    },
+    "actions": {
+      "changeRole": "Change role",
+      "resend": "Resend invite",
+      "remove": "Remove from workspace"
+    },
+    "toast": {
+      "missingEmail": "Enter an email address.",
+      "mustSignIn": "You must be signed in.",
+      "noWorkspace": "No workspace found for your account.",
+      "ownerOnly": "Only Owners can invite members.",
+      "sent": "Invitation sent to {{email}}"
+    }
+  },
+  "settings": {
+    "title": "Workspace settings",
+    "description": "Configure your workspace, preferences and notifications.",
+    "workspace": {
+      "title": "Workspace",
+      "subtitle": "Only Owners can edit workspace details.",
+      "name": "Workspace name",
+      "slug": "URL slug"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Switch between light and dark themes.",
+      "light": "Light mode",
+      "dark": "Dark mode"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Decide what alerts your team receives.",
+      "items": {
+        "scanMismatch": {
+          "title": "Scan mismatch alerts",
+          "desc": "Notify supervisors when a station has more than 3 mismatches in an hour."
+        },
+        "slaBreach": {
+          "title": "SLA breach warnings",
+          "desc": "Alert when packing times exceed station targets."
+        },
+        "dailySummary": {
+          "title": "Daily summary email",
+          "desc": "Receive a digest of yesterday's operations every morning."
+        }
+      }
+    },
+    "danger": {
+      "title": "Danger zone",
+      "subtitle": "Permanently delete this workspace and all associated data.",
+      "delete": "Delete workspace"
+    }
+  },
+  "errors": {
+    "pageNotFound": "Page not found",
+    "pageNotFoundDesc": "The page you're looking for doesn't exist or has been moved.",
+    "didNotLoad": "This page didn't load",
+    "didNotLoadDesc": "Something went wrong on our end. You can try refreshing or head back home."
+  }
+}

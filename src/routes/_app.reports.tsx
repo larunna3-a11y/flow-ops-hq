@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -48,29 +49,30 @@ const chartTooltip = {
 };
 
 function ReportsPage() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Reporting & analytics"
-        description="Marketplace performance, courier KPIs and packer productivity."
+        title={t("reports.title")}
+        description={t("reports.description")}
         actions={
           <>
-            <Button variant="outline" size="sm">Last 30 days</Button>
-            <Button size="sm"><Download className="h-4 w-4" /> Export CSV</Button>
+            <Button variant="outline" size="sm">{t("common.last30Days")}</Button>
+            <Button size="sm"><Download className="h-4 w-4" /> {t("common.exportCsv")}</Button>
           </>
         }
       />
 
       <Tabs defaultValue="marketplaces" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="marketplaces">Marketplaces</TabsTrigger>
-          <TabsTrigger value="couriers">Couriers</TabsTrigger>
-          <TabsTrigger value="productivity">User productivity</TabsTrigger>
+          <TabsTrigger value="marketplaces">{t("reports.tabs.marketplaces")}</TabsTrigger>
+          <TabsTrigger value="couriers">{t("reports.tabs.couriers")}</TabsTrigger>
+          <TabsTrigger value="productivity">{t("reports.tabs.productivity")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="marketplaces" className="space-y-4">
           <div className="rounded-lg border bg-card p-5 shadow-card">
-            <h3 className="text-sm font-semibold">Orders vs. returns by marketplace</h3>
+            <h3 className="text-sm font-semibold">{t("reports.marketplaces.chartTitle")}</h3>
             <div className="mt-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={marketplaceBreakdown}>
@@ -90,10 +92,10 @@ function ReportsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Marketplace</TableHead>
-                  <TableHead className="text-right">Orders</TableHead>
-                  <TableHead className="text-right">Returns</TableHead>
-                  <TableHead className="text-right">Return rate</TableHead>
+                  <TableHead>{t("reports.marketplaces.columns.marketplace")}</TableHead>
+                  <TableHead className="text-right">{t("reports.marketplaces.columns.orders")}</TableHead>
+                  <TableHead className="text-right">{t("reports.marketplaces.columns.returns")}</TableHead>
+                  <TableHead className="text-right">{t("reports.marketplaces.columns.returnRate")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -114,7 +116,7 @@ function ReportsPage() {
 
         <TabsContent value="couriers" className="space-y-4">
           <div className="rounded-lg border bg-card p-5 shadow-card">
-            <h3 className="text-sm font-semibold">On-time delivery rate by courier</h3>
+            <h3 className="text-sm font-semibold">{t("reports.couriers.chartTitle")}</h3>
             <div className="mt-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={courierStats} layout="vertical">
@@ -136,9 +138,9 @@ function ReportsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Courier</TableHead>
-                  <TableHead className="text-right">Shipments</TableHead>
-                  <TableHead className="text-right">On-time %</TableHead>
+                  <TableHead>{t("reports.couriers.columns.courier")}</TableHead>
+                  <TableHead className="text-right">{t("reports.couriers.columns.shipments")}</TableHead>
+                  <TableHead className="text-right">{t("reports.couriers.columns.onTime")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -156,7 +158,7 @@ function ReportsPage() {
 
         <TabsContent value="productivity" className="space-y-4">
           <div className="rounded-lg border bg-card p-5 shadow-card">
-            <h3 className="text-sm font-semibold">Weekly packed volume trend</h3>
+            <h3 className="text-sm font-semibold">{t("reports.productivity.chartTitle")}</h3>
             <div className="mt-4 h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={packingTrend}>
@@ -174,11 +176,11 @@ function ReportsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Items packed</TableHead>
-                  <TableHead className="text-right">Accuracy</TableHead>
-                  <TableHead className="text-right">Hours</TableHead>
+                  <TableHead>{t("reports.productivity.columns.user")}</TableHead>
+                  <TableHead>{t("reports.productivity.columns.role")}</TableHead>
+                  <TableHead className="text-right">{t("reports.productivity.columns.packed")}</TableHead>
+                  <TableHead className="text-right">{t("reports.productivity.columns.accuracy")}</TableHead>
+                  <TableHead className="text-right">{t("reports.productivity.columns.hours")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

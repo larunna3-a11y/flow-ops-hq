@@ -1,0 +1,655 @@
+{
+  "common": {
+    "save": "Simpan perubahan",
+    "cancel": "Batal",
+    "delete": "Hapus",
+    "edit": "Ubah",
+    "search": "Cari",
+    "export": "Ekspor",
+    "exportCsv": "Ekspor CSV",
+    "exportReport": "Ekspor laporan",
+    "exportLog": "Ekspor log",
+    "filters": "Filter",
+    "loading": "Memuat…",
+    "sending": "Mengirim…",
+    "signingIn": "Masuk…",
+    "creating": "Membuat workspace…",
+    "last7Days": "7 hari terakhir",
+    "last30Days": "30 hari terakhir",
+    "updatedJustNow": "Baru saja diperbarui",
+    "all": "Semua",
+    "active": "aktif",
+    "pending": "menunggu",
+    "unassigned": "Belum ditugaskan",
+    "members": "anggota",
+    "tryAgain": "Coba lagi",
+    "goHome": "Ke beranda"
+  },
+  "language": {
+    "switch": "Bahasa",
+    "english": "English",
+    "indonesian": "Bahasa Indonesia"
+  },
+  "nav": {
+    "home": "Beranda",
+    "features": "Fitur",
+    "pricing": "Harga",
+    "login": "Masuk",
+    "getStarted": "Mulai sekarang",
+    "toggleMenu": "Buka menu",
+    "toggleTheme": "Ganti tema",
+    "notifications": "Notifikasi"
+  },
+  "footer": {
+    "tagline": "Operasional gudang untuk tim e-commerce dan marketplace modern.",
+    "product": "Produk",
+    "solutions": "Solusi",
+    "company": "Perusahaan",
+    "ecommerceBrands": "Brand e-commerce",
+    "marketplaceSellers": "Seller marketplace",
+    "warehouseTeams": "Tim gudang",
+    "about": "Tentang",
+    "contact": "Kontak",
+    "privacy": "Privasi",
+    "rights": "© {{year}} FlowOps. Hak cipta dilindungi.",
+    "builtFor": "Dibangun untuk gudang yang mengirim."
+  },
+  "landing": {
+    "hero": {
+      "badge": "Baru — Analitik packing real-time",
+      "titleLead": "Operasional gudang,",
+      "titleAccent": "akhirnya mengalir lancar.",
+      "subtitle": "FlowOps menyatukan packing, scanning, retur, dan pelaporan dalam satu workspace untuk brand e-commerce, seller marketplace, dan tim gudang.",
+      "ctaPrimary": "Mulai gratis",
+      "ctaSecondary": "Lihat cara kerjanya",
+      "footnote": "Tanpa kartu kredit · Workspace by invite · Batalkan kapan saja",
+      "previewUrl": "app.flowops.io/dashboard",
+      "stat1": "Order ter-packing",
+      "stat2": "Rata-rata waktu packing",
+      "stat3": "Tingkat retur",
+      "deltaUp": "+12%",
+      "deltaDown1": "-8%",
+      "deltaDown2": "-0,4%",
+      "deltaVsLastWeek": "vs minggu lalu",
+      "throughput": "Throughput packing"
+    },
+    "logos": {
+      "trustedBy": "Dipercaya tim operasional yang mengirim jutaan order"
+    },
+    "overview": {
+      "eyebrow": "Sekilas produk",
+      "title": "Satu workspace untuk semua gerak gudang Anda.",
+      "body": "FlowOps menggantikan spreadsheet, sticky notes, dan tools terpisah yang dipakai tim Anda untuk packing, scanning, dan memproses retur. Semua mengalir ke satu catatan operasional yang dilihat oleh Owner, Supervisor, Packer, dan Return Staff.",
+      "bullets": [
+        "Antrian packing live dengan prioritas berbasis SLA",
+        "Audit trail scan barcode dan QR (siap scanner)",
+        "Alur inspeksi retur dengan hasil resolusi",
+        "Laporan marketplace, kurir, dan produktivitas user"
+      ],
+      "moduleLabels": {
+        "packing": "Operasi Packing",
+        "scanning": "Scan Tracking",
+        "returns": "Retur",
+        "reports": "Laporan"
+      },
+      "moduleHint": "Modul bawaan, siap pakai hari pertama."
+    },
+    "features": {
+      "eyebrow": "Fitur",
+      "title": "Semua yang dibutuhkan tim operasional, tanpa yang tidak perlu.",
+      "subtitle": "Dirancang dari lantai gudang untuk operasional yang mengirim — bukan adaptasi ERP umum.",
+      "items": {
+        "packing": {
+          "title": "Operasi packing",
+          "desc": "Antrian live, filter prioritas, dan performa per packer — sehingga order berikutnya selalu tepat."
+        },
+        "scanning": {
+          "title": "Tracking Barcode & QR",
+          "desc": "Setiap scan tercatat dengan waktu, user, dan station — audit trail lengkap."
+        },
+        "returns": {
+          "title": "Manajemen retur",
+          "desc": "Intake RMA, grading inspeksi, dan hasil resolusi dalam satu alur."
+        },
+        "reports": {
+          "title": "Laporan & analitik",
+          "desc": "Mix marketplace, KPI kurir, dan produktivitas user diperbarui real-time."
+        },
+        "rbac": {
+          "title": "Akses berbasis peran",
+          "desc": "Owner, Supervisor, Packer, dan Return Staff — sesuai kebutuhan tiap peran."
+        },
+        "invites": {
+          "title": "Undangan workspace",
+          "desc": "User pertama menjadi Owner. Tidak ada pendaftaran publik — by invite saja."
+        }
+      }
+    },
+    "howItWorks": {
+      "eyebrow": "Cara kerjanya",
+      "title": "Dari spreadsheet ke lantai pengiriman dalam hitungan jam.",
+      "step": "Langkah {{n}}",
+      "steps": {
+        "create": {
+          "title": "Buat workspace Anda",
+          "desc": "Daftar dalam hitungan detik. User pertama menjadi Owner workspace."
+        },
+        "invite": {
+          "title": "Undang tim Anda",
+          "desc": "Tambahkan Supervisor, Packer, dan Return Staff dengan akses berbasis peran."
+        },
+        "ship": {
+          "title": "Kirim dengan percaya diri",
+          "desc": "Jalankan packing, scanning, dan retur dari satu catatan operasional."
+        }
+      }
+    },
+    "pricing": {
+      "eyebrow": "Harga",
+      "title": "Harga sederhana yang menyesuaikan volume pengiriman Anda.",
+      "subtitle": "Mulai gratis. Upgrade saat tim Anda siap.",
+      "mostPopular": "Paling populer"
+    },
+    "faq": {
+      "eyebrow": "FAQ",
+      "title": "Pertanyaan yang sering diajukan",
+      "items": [
+        {
+          "q": "Untuk siapa FlowOps?",
+          "a": "Tim operasional brand e-commerce, seller marketplace, dan gudang 3PL yang perlu mengoordinasikan packing, scanning, dan retur dalam satu tempat."
+        },
+        {
+          "q": "Apakah siapa pun bisa mendaftar?",
+          "a": "User yang pertama mendaftar membuat dan memiliki workspace. Setelah itu, anggota baru hanya bisa bergabung melalui undangan — tidak ada pendaftaran publik."
+        },
+        {
+          "q": "Peran apa saja yang didukung?",
+          "a": "Owner, Supervisor, Packer, dan Return Staff. Setiap peran memiliki akses sesuai modul dan aksi yang dibutuhkan."
+        },
+        {
+          "q": "Apakah FlowOps mendukung scanner barcode?",
+          "a": "Ya. Modul scan tracking siap scanner dan merekam setiap event dengan audit trail lengkap. Integrasi hardware ada di roadmap berikutnya."
+        },
+        {
+          "q": "Marketplace mana yang terintegrasi?",
+          "a": "Integrasi marketplace ada di roadmap dekat. Saat ini Anda bisa mengimpor order dan menjalankan laporan mix marketplace memakai data contoh atau upload."
+        },
+        {
+          "q": "Bisa berhenti kapan saja?",
+          "a": "Bisa. Paket berbayar bersifat bulanan dan bisa dibatalkan dari pengaturan workspace."
+        }
+      ]
+    },
+    "cta": {
+      "title": "Siap membawa gudang Anda mengalir lancar?",
+      "subtitle": "Buat workspace dalam kurang dari satu menit. Undang tim Anda. Mulai kirim lebih cerdas hari ini.",
+      "primary": "Mulai gratis",
+      "secondary": "Saya sudah punya akun"
+    }
+  },
+  "features": {
+    "eyebrow": "Fitur",
+    "title": "Semua kebutuhan gudang Anda dalam satu workspace.",
+    "subtitle": "Enam modul bawaan yang menggantikan spreadsheet, sticky notes, dan tools terpisah yang dipakai tim Anda.",
+    "ctaStart": "Mulai gratis",
+    "ctaPricing": "Lihat harga",
+    "modules": {
+      "packing": {
+        "title": "Operasi packing",
+        "desc": "Antrian live yang menampilkan order berikutnya untuk dipacking dengan prioritas SLA, performa per packer, dan konteks station.",
+        "points": [
+          "Antrian order live dengan filter prioritas",
+          "Throughput & akurasi per packer",
+          "Konteks station dan shift",
+          "Peringatan dini pelanggaran SLA"
+        ]
+      },
+      "scanning": {
+        "title": "Tracking scan Barcode & QR",
+        "desc": "Setiap scan tercatat dengan waktu, user, station, dan hasil — audit trail operasional lengkap.",
+        "points": [
+          "Penangkapan event siap scanner",
+          "Audit trail penuh per SKU dan order",
+          "Pencatatan mismatch & exception",
+          "Riwayat scan bisa dicari"
+        ]
+      },
+      "returns": {
+        "title": "Manajemen retur",
+        "desc": "Dari intake RMA hingga grading inspeksi dan resolusi — seluruh siklus retur dalam satu alur.",
+        "points": [
+          "Intake RMA & konteks pelanggan",
+          "Grading inspeksi & foto",
+          "Refund / restock / discard",
+          "Analitik tingkat retur"
+        ]
+      },
+      "reports": {
+        "title": "Laporan & analitik",
+        "desc": "Mix marketplace, KPI kurir, dan laporan produktivitas user — diperbarui real-time.",
+        "points": [
+          "Mix & volume marketplace",
+          "Laporan SLA & biaya kurir",
+          "Dashboard produktivitas user",
+          "Ekspor ke CSV"
+        ]
+      },
+      "rbac": {
+        "title": "Akses berbasis peran",
+        "desc": "Owner, Supervisor, Packer, dan Return Staff — setiap peran fokus pada modul dan aksi yang dibutuhkan.",
+        "points": [
+          "Empat peran bawaan",
+          "Isolasi level workspace",
+          "Akses modul granular",
+          "Log audit aksi admin"
+        ]
+      },
+      "invites": {
+        "title": "Workspace & undangan",
+        "desc": "User pertama menjadi Owner. Setelah itu, anggota bergabung lewat undangan saja — tanpa pendaftaran publik.",
+        "points": [
+          "Satu workspace per akun",
+          "Undangan dikendalikan Owner",
+          "Onboarding berbasis email",
+          "Status anggota & nonaktif"
+        ]
+      }
+    }
+  },
+  "pricing": {
+    "eyebrow": "Harga",
+    "title": "Harga sederhana yang menyesuaikan volume pengiriman Anda.",
+    "subtitle": "Mulai gratis. Upgrade saat tim Anda siap. Tanpa biaya tersembunyi.",
+    "mostPopular": "Paling populer",
+    "compareTitle": "Bandingkan paket",
+    "compareFeature": "Fitur",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "price": "Rp0",
+        "cadence": "/bln",
+        "desc": "Untuk tim kecil yang baru memulai.",
+        "cta": "Mulai gratis",
+        "features": [
+          "1 workspace",
+          "Hingga 3 user",
+          "Modul packing & scanning",
+          "Laporan dasar",
+          "Dukungan komunitas"
+        ]
+      },
+      "growth": {
+        "name": "Growth",
+        "price": "Rp749K",
+        "cadence": "/bln",
+        "desc": "Untuk operasional e-commerce yang berkembang.",
+        "cta": "Mulai uji coba 14 hari",
+        "features": [
+          "User tanpa batas",
+          "Semua modul operasional",
+          "Analitik lanjutan",
+          "Alur retur",
+          "Dukungan email prioritas"
+        ]
+      },
+      "scale": {
+        "name": "Scale",
+        "price": "Custom",
+        "cadence": "",
+        "desc": "Untuk operasional multi-gudang.",
+        "cta": "Hubungi sales",
+        "features": [
+          "Multi-gudang",
+          "SSO & audit log",
+          "CSM khusus",
+          "Integrasi kustom",
+          "SLA uptime 99,9%"
+        ]
+      }
+    },
+    "compare": {
+      "users": "User",
+      "packingScanning": "Packing & Scanning",
+      "returns": "Manajemen retur",
+      "analytics": "Analitik lanjutan",
+      "multiWarehouse": "Multi-gudang",
+      "sso": "SSO & audit log",
+      "support": "Dukungan",
+      "values": {
+        "unlimited": "Tanpa batas",
+        "included": "Termasuk",
+        "none": "—",
+        "community": "Komunitas",
+        "priorityEmail": "Email prioritas",
+        "dedicatedCsm": "CSM khusus"
+      }
+    }
+  },
+  "auth": {
+    "login": {
+      "title": "Selamat datang kembali",
+      "subtitle": "Masuk ke workspace FlowOps Anda.",
+      "email": "Email kerja",
+      "emailPlaceholder": "anda@perusahaan.com",
+      "password": "Kata sandi",
+      "forgot": "Lupa?",
+      "submit": "Masuk",
+      "newHere": "Baru di sini?",
+      "createWorkspace": "Buat workspace",
+      "noPublicSignup": "Tidak ada pendaftaran publik. Anggota baru bergabung lewat undangan saja."
+    },
+    "signup": {
+      "title": "Buat workspace Anda",
+      "subtitle": "User yang pertama mendaftar menjadi Owner workspace.",
+      "workspaceName": "Nama workspace",
+      "workspaceNamePlaceholder": "Logistik Nusantara",
+      "yourName": "Nama Anda",
+      "yourNamePlaceholder": "Budi Santoso",
+      "email": "Email kerja",
+      "emailPlaceholder": "anda@perusahaan.com",
+      "password": "Buat kata sandi",
+      "passwordPlaceholder": "Minimal 8 karakter",
+      "submit": "Buat workspace sebagai Owner",
+      "alreadyHave": "Sudah punya akun?",
+      "signIn": "Masuk",
+      "copyright": "© FlowOps {{year}}",
+      "pitchBadge": "Operasional Gudang",
+      "pitchTitle": "Packing lebih cepat, kirim lebih rapi, retur lebih cerdas.",
+      "pitchSubtitle": "Bergabunglah dengan tim operasional yang menjalankan seluruh gudang dalam satu workspace.",
+      "pitch": {
+        "live": { "title": "Aktif dalam menit", "desc": "Tanpa instalasi, tanpa setup call." },
+        "invite": { "title": "Undang tim Anda", "desc": "Owner, Supervisor, Packer, Retur." },
+        "secure": { "title": "Aman secara default", "desc": "Akses berbasis peran di setiap aksi." },
+        "free": { "title": "Gratis untuk mulai", "desc": "Upgrade saat tim Anda siap." }
+      }
+    },
+    "errors": {
+      "completeFields": "Lengkapi semua isian (kata sandi ≥ 8 karakter).",
+      "missingCredentials": "Masukkan email dan kata sandi Anda.",
+      "invalidCredentials": "Kredensial tidak valid.",
+      "couldNotCreate": "Tidak dapat membuat workspace.",
+      "genericAuth": "Terjadi kesalahan. Silakan coba lagi."
+    },
+    "success": {
+      "workspaceCreated": "Workspace berhasil dibuat. Selamat bergabung!"
+    }
+  },
+  "sidebar": {
+    "groups": {
+      "operations": "Operasional",
+      "insights": "Wawasan",
+      "workspace": "Workspace"
+    },
+    "items": {
+      "dashboard": "Dashboard",
+      "packing": "Packing",
+      "scanning": "Scan Tracking",
+      "returns": "Retur",
+      "reports": "Laporan",
+      "users": "User",
+      "settings": "Pengaturan"
+    },
+    "plan": "Paket {{plan}}",
+    "membersCount": "{{count}} anggota"
+  },
+  "topbar": {
+    "searchPlaceholder": "Cari order, RMA, user…",
+    "settings": "Pengaturan",
+    "team": "Tim",
+    "signOut": "Keluar"
+  },
+  "dashboard": {
+    "title": "Sekilas operasional",
+    "description": "Snapshot live packing, scanning, dan retur di workspace Anda.",
+    "kpis": {
+      "packedToday": "Packing hari ini",
+      "packedHint": "Target: 400",
+      "scansLogged": "Scan tercatat",
+      "scansHint": "Di 6 station",
+      "returnsReceived": "Retur diterima",
+      "returnsHint": "18 menunggu inspeksi",
+      "onTimeShip": "Tingkat pengiriman tepat waktu",
+      "onTimeHint": "Di 4 kurir"
+    },
+    "performance": {
+      "title": "Performa packing",
+      "subtitle": "Order packing harian vs. target",
+      "trend": "+18% minggu ini"
+    },
+    "marketplaceMix": {
+      "title": "Mix marketplace",
+      "subtitle": "Order per channel (30h)"
+    },
+    "queue": {
+      "title": "Antrian packing live",
+      "subtitle": "Order terbaru yang mengalir di station",
+      "open": "Buka antrian",
+      "items": "{{count}} item",
+      "packerLabel": "Packer: {{name}}"
+    },
+    "activity": {
+      "title": "Aktivitas user",
+      "team": "Tim"
+    },
+    "alert": {
+      "title": "3 station melaporkan ketidakcocokan scan",
+      "body": "Pack Station 02 memiliki 4 scan tidak cocok dalam satu jam terakhir. Tinjau audit trail untuk investigasi.",
+      "open": "Buka log scan"
+    }
+  },
+  "packing": {
+    "title": "Operasi packing",
+    "description": "Antrian live, throughput station, dan penugasan packer.",
+    "newTask": "Tugas packing baru",
+    "kpis": {
+      "inQueue": "Di antrian",
+      "inQueueHint": "Prioritas tinggi: 18",
+      "activePackers": "Packer aktif",
+      "activePackersHint": "Di 4 station",
+      "avgTime": "Rata-rata waktu packing",
+      "avgTimeHint": "Target: 2m 30d",
+      "accuracy": "Akurasi hari ini",
+      "accuracyHint": "Terverifikasi scan"
+    },
+    "tabs": {
+      "all": "Semua",
+      "queued": "Antri",
+      "inProgress": "Dikerjakan",
+      "packed": "Ter-packing",
+      "shipped": "Dikirim"
+    },
+    "searchPlaceholder": "Cari berdasarkan no. order",
+    "columns": {
+      "order": "Order",
+      "marketplace": "Marketplace",
+      "items": "Item",
+      "courier": "Kurir",
+      "packer": "Packer",
+      "priority": "Prioritas",
+      "status": "Status",
+      "created": "Dibuat"
+    },
+    "priority": {
+      "high": "tinggi",
+      "normal": "normal",
+      "low": "rendah"
+    },
+    "status": {
+      "queued": "antri",
+      "in_progress": "dikerjakan",
+      "packed": "ter-packing",
+      "shipped": "dikirim"
+    }
+  },
+  "scanning": {
+    "title": "Tracking scan Barcode & QR",
+    "description": "Setiap scan di pack station dan return bay, sepenuhnya teraudit.",
+    "connectScanner": "Hubungkan scanner",
+    "kpis": {
+      "scansToday": "Scan hari ini",
+      "scansHint": "Barcode + QR",
+      "matchRate": "Tingkat cocok",
+      "matchHint": "24 jam terakhir",
+      "mismatches": "Tidak cocok",
+      "mismatchHint": "Menunggu review",
+      "activeStations": "Station aktif",
+      "stationHint": "2 offline"
+    },
+    "notice": {
+      "title": "Hardware scanner belum terhubung",
+      "body": "Modul ini menampilkan UI audit trail. Penangkapan barcode live akan diaktifkan di rilis berikutnya."
+    },
+    "recent": "Scan terbaru",
+    "columns": {
+      "time": "Waktu",
+      "type": "Tipe",
+      "code": "Kode",
+      "order": "Order",
+      "station": "Station",
+      "scannedBy": "Di-scan oleh",
+      "result": "Hasil"
+    }
+  },
+  "returns": {
+    "title": "Manajemen retur",
+    "description": "Lacak RMA dari inspeksi, restock, hingga penolakan.",
+    "newRma": "RMA baru",
+    "kpis": {
+      "open": "Retur terbuka",
+      "openHint": "18 menunggu inspeksi",
+      "restocked": "Restock (7h)",
+      "rejected": "Ditolak (7h)",
+      "returnRate": "Tingkat retur",
+      "rateHint": "Dari order terkirim"
+    },
+    "tabs": {
+      "all": "Semua",
+      "received": "Diterima",
+      "inspecting": "Inspeksi",
+      "restocked": "Restock",
+      "rejected": "Ditolak"
+    },
+    "columns": {
+      "rma": "RMA",
+      "order": "Order",
+      "marketplace": "Marketplace",
+      "reason": "Alasan",
+      "assigned": "Ditugaskan",
+      "received": "Diterima",
+      "status": "Status"
+    }
+  },
+  "reports": {
+    "title": "Laporan & analitik",
+    "description": "Performa marketplace, KPI kurir, dan produktivitas packer.",
+    "tabs": {
+      "marketplaces": "Marketplace",
+      "couriers": "Kurir",
+      "productivity": "Produktivitas user"
+    },
+    "marketplaces": {
+      "chartTitle": "Order vs. retur per marketplace",
+      "columns": {
+        "marketplace": "Marketplace",
+        "orders": "Order",
+        "returns": "Retur",
+        "returnRate": "Tingkat retur"
+      }
+    },
+    "couriers": {
+      "chartTitle": "Tingkat pengiriman tepat waktu per kurir",
+      "columns": {
+        "courier": "Kurir",
+        "shipments": "Pengiriman",
+        "onTime": "Tepat waktu %"
+      }
+    },
+    "productivity": {
+      "chartTitle": "Tren volume packing mingguan",
+      "columns": {
+        "user": "User",
+        "role": "Peran",
+        "packed": "Item ter-packing",
+        "accuracy": "Akurasi",
+        "hours": "Jam"
+      }
+    }
+  },
+  "users": {
+    "title": "Manajemen user",
+    "description": "Hanya Owner. Undang rekan tim dan tetapkan peran untuk operasional gudang.",
+    "invite": "Undang anggota",
+    "dialog": {
+      "title": "Undang rekan tim",
+      "description": "Mereka akan menerima email undangan untuk bergabung dengan workspace Anda. Pendaftaran publik tidak diizinkan.",
+      "email": "Email kerja",
+      "emailPlaceholder": "nama@perusahaan.com",
+      "role": "Peran",
+      "send": "Kirim undangan"
+    },
+    "searchPlaceholder": "Cari anggota",
+    "columns": {
+      "member": "Anggota",
+      "role": "Peran",
+      "status": "Status",
+      "lastActive": "Aktivitas terakhir"
+    },
+    "actions": {
+      "changeRole": "Ubah peran",
+      "resend": "Kirim ulang undangan",
+      "remove": "Hapus dari workspace"
+    },
+    "toast": {
+      "missingEmail": "Masukkan alamat email.",
+      "mustSignIn": "Anda harus masuk terlebih dahulu.",
+      "noWorkspace": "Tidak ada workspace untuk akun Anda.",
+      "ownerOnly": "Hanya Owner yang dapat mengundang anggota.",
+      "sent": "Undangan terkirim ke {{email}}"
+    }
+  },
+  "settings": {
+    "title": "Pengaturan workspace",
+    "description": "Konfigurasi workspace, preferensi, dan notifikasi.",
+    "workspace": {
+      "title": "Workspace",
+      "subtitle": "Hanya Owner yang dapat mengubah detail workspace.",
+      "name": "Nama workspace",
+      "slug": "URL slug"
+    },
+    "appearance": {
+      "title": "Tampilan",
+      "subtitle": "Beralih antara tema terang dan gelap.",
+      "light": "Mode terang",
+      "dark": "Mode gelap"
+    },
+    "notifications": {
+      "title": "Notifikasi",
+      "subtitle": "Tentukan peringatan apa yang diterima tim Anda.",
+      "items": {
+        "scanMismatch": {
+          "title": "Peringatan scan tidak cocok",
+          "desc": "Beri tahu supervisor saat sebuah station memiliki lebih dari 3 scan tidak cocok dalam satu jam."
+        },
+        "slaBreach": {
+          "title": "Peringatan pelanggaran SLA",
+          "desc": "Beri peringatan saat waktu packing melebihi target station."
+        },
+        "dailySummary": {
+          "title": "Email ringkasan harian",
+          "desc": "Terima ringkasan operasional kemarin setiap pagi."
+        }
+      }
+    },
+    "danger": {
+      "title": "Zona berbahaya",
+      "subtitle": "Hapus workspace ini secara permanen beserta seluruh datanya.",
+      "delete": "Hapus workspace"
+    }
+  },
+  "errors": {
+    "pageNotFound": "Halaman tidak ditemukan",
+    "pageNotFoundDesc": "Halaman yang Anda cari tidak ada atau telah dipindahkan.",
+    "didNotLoad": "Halaman ini gagal dimuat",
+    "didNotLoadDesc": "Ada masalah di sisi kami. Anda dapat memuat ulang atau kembali ke beranda."
+  }
+}

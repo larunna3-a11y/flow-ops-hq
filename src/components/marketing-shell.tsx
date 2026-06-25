@@ -1,17 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { Boxes, Menu, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-const navLinks = [
-  { label: "Home", to: "/" as const },
-  { label: "Features", to: "/features" as const },
-  { label: "Pricing", to: "/pricing" as const },
-];
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export function MarketingShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const { t } = useTranslation();
+
+  const navLinks = [
+    { label: t("nav.home"), to: "/" as const },
+    { label: t("nav.features"), to: "/features" as const },
+    { label: t("nav.pricing"), to: "/pricing" as const },
+  ];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -40,22 +43,26 @@ export function MarketingShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="hidden items-center gap-2 md:flex">
+            <LanguageSwitcher variant="marketing" />
             <Button asChild variant="ghost" size="sm">
-              <Link to="/login">Login</Link>
+              <Link to="/login">{t("nav.login")}</Link>
             </Button>
             <Button asChild size="sm">
-              <Link to="/signup">Get started</Link>
+              <Link to="/signup">{t("nav.getStarted")}</Link>
             </Button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border md:hidden"
-            aria-label="Toggle menu"
-          >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            <LanguageSwitcher variant="marketing" />
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border"
+              aria-label={t("nav.toggleMenu")}
+            >
+              {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
 
         <div className={cn("border-t border-border/60 md:hidden", open ? "block" : "hidden")}>
@@ -72,10 +79,10 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             ))}
             <div className="mt-2 flex flex-col gap-2 border-t border-border/60 pt-3">
               <Button asChild variant="outline" size="sm">
-                <Link to="/login" onClick={() => setOpen(false)}>Login</Link>
+                <Link to="/login" onClick={() => setOpen(false)}>{t("nav.login")}</Link>
               </Button>
               <Button asChild size="sm">
-                <Link to="/signup" onClick={() => setOpen(false)}>Get started</Link>
+                <Link to="/signup" onClick={() => setOpen(false)}>{t("nav.getStarted")}</Link>
               </Button>
             </div>
           </div>
@@ -95,39 +102,39 @@ export function MarketingShell({ children }: { children: ReactNode }) {
                 <span className="text-base font-semibold tracking-tight">FlowOps</span>
               </Link>
               <p className="mt-3 max-w-xs text-sm text-muted-foreground">
-                Warehouse operations for modern e-commerce and marketplace teams.
+                {t("footer.tagline")}
               </p>
             </div>
 
             <FooterCol
-              title="Product"
+              title={t("footer.product")}
               links={[
-                { label: "Features", to: "/features" },
-                { label: "Pricing", to: "/pricing" },
-                { label: "Login", to: "/login" },
-                { label: "Get started", to: "/signup" },
+                { label: t("nav.features"), to: "/features" },
+                { label: t("nav.pricing"), to: "/pricing" },
+                { label: t("nav.login"), to: "/login" },
+                { label: t("nav.getStarted"), to: "/signup" },
               ]}
             />
             <FooterCol
-              title="Solutions"
+              title={t("footer.solutions")}
               links={[
-                { label: "E-commerce brands", to: "/features" },
-                { label: "Marketplace sellers", to: "/features" },
-                { label: "Warehouse teams", to: "/features" },
+                { label: t("footer.ecommerceBrands"), to: "/features" },
+                { label: t("footer.marketplaceSellers"), to: "/features" },
+                { label: t("footer.warehouseTeams"), to: "/features" },
               ]}
             />
             <FooterCol
-              title="Company"
+              title={t("footer.company")}
               links={[
-                { label: "About", to: "/" },
-                { label: "Contact", to: "/" },
-                { label: "Privacy", to: "/" },
+                { label: t("footer.about"), to: "/" },
+                { label: t("footer.contact"), to: "/" },
+                { label: t("footer.privacy"), to: "/" },
               ]}
             />
           </div>
           <div className="mt-10 flex flex-col items-start justify-between gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-            <span>© {new Date().getFullYear()} FlowOps. All rights reserved.</span>
-            <span>Built for warehouses that ship.</span>
+            <span>{t("footer.rights", { year: new Date().getFullYear() })}</span>
+            <span>{t("footer.builtFor")}</span>
           </div>
         </div>
       </footer>
