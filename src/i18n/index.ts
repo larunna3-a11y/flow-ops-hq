@@ -1,6 +1,5 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
-import LanguageDetector from "i18next-browser-languagedetector";
 
 import en from "./locales/en.json";
 import id from "./locales/id.json";
@@ -13,33 +12,39 @@ export const LANGUAGES = [
 export type LanguageCode = (typeof LANGUAGES)[number]["code"];
 
 const STORAGE_KEY = "flowops-language";
+const isBrowser = typeof window !== "undefined";
+
+function readStoredLanguage(): LanguageCode {
+  if (!isBrowser) return "en";
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "en" || stored === "id") return stored;
+    const nav = window.navigator?.language?.slice(0, 2).toLowerCase();
+    if (nav === "id") return "id";
+  } catch {
+    /* ignore */
+  }
+  return "en";
+}
 
 if (!i18n.isInitialized) {
-  i18n
-    .use(LanguageDetector)
-    .use(initReactI18next)
-    .init({
-      resources: {
-        en: { translation: en },
-        id: { translation: id },
-      },
-      fallbackLng: "en",
-      supportedLngs: ["en", "id"],
-      // SSR-safe: server has no localStorage; client picks up the stored value.
-      lng: typeof window === "undefined" ? "en" : undefined,
-      interpolation: { escapeValue: false },
-      detection: {
-        order: ["localStorage", "navigator", "htmlTag"],
-        lookupLocalStorage: STORAGE_KEY,
-        caches: ["localStorage"],
-      },
-      react: { useSuspense: false },
-    });
+  i18n.use(initReactI18next).init({
+    resources: {
+      en: { translation: en },
+      id: { translation: id },
+    },
+    lng: readStoredLanguage(),
+    fallbackLng: "en",
+    supportedLngs: ["en", "id"],
+    interpolation: { escapeValue: false },
+    react: { useSuspense: false },
+    returnNull: false,
+  });
 }
 
 export function setLanguage(lng: LanguageCode) {
   void i18n.changeLanguage(lng);
-  if (typeof window !== "undefined") {
+  if (isBrowser) {
     try {
       window.localStorage.setItem(STORAGE_KEY, lng);
     } catch {
