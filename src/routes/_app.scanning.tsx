@@ -12,21 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
 import { usePackingRecords } from "@/lib/use-warehouse-data";
@@ -80,10 +67,7 @@ function ScanningPage() {
       // Only intercept when focus is NOT in another input/textarea/select
       const active = document.activeElement;
       const inFormField =
-        active &&
-        (active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.tagName === "SELECT");
+        active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
 
       if (inFormField) return;
 
@@ -153,9 +137,7 @@ function ScanningPage() {
     applyRules(code, trackingNumber, orderNumber);
     // Give React one tick to update state before reading it in submit
     setTimeout(() => {
-      document.getElementById("scanning-form")?.dispatchEvent(
-        new Event("submit", { bubbles: true, cancelable: true })
-      );
+      document.getElementById("scanning-form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     }, 50);
   }
 
@@ -194,27 +176,20 @@ function ScanningPage() {
         .select("id, raw_code, tracking_number, order_number, created_at")
         .eq("workspace_id", workspace.id);
       if (trackingNumber.trim()) {
-        dupQuery = dupQuery.or(
-          `raw_code.eq.${code},tracking_number.eq.${trackingNumber.trim()}`
-        );
+        dupQuery = dupQuery.or(`raw_code.eq.${code},tracking_number.eq.${trackingNumber.trim()}`);
       } else {
         dupQuery = dupQuery.eq("raw_code", code);
       }
       const { data: dups } = await dupQuery.limit(1);
       if (dups && dups.length > 0) {
         const d = dups[0];
-        toast.warning(
-          `Duplicate — already scanned at ${new Date(d.created_at).toLocaleString()}`,
-          { description: `Order ${d.order_number ?? "—"} · ${d.raw_code}` }
-        );
+        toast.warning(`Duplicate — already scanned at ${new Date(d.created_at).toLocaleString()}`, {
+          description: `Order ${d.order_number ?? "—"} · ${d.raw_code}`,
+        });
         return;
       }
 
-      const me = await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", userId)
-        .maybeSingle();
+      const me = await supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle();
       const userName = me?.data?.full_name || me?.data?.email || "Operator";
       const role = ws.data?.role ?? null;
       const nowIso = new Date().toISOString();
@@ -247,9 +222,7 @@ function ScanningPage() {
         return;
       }
 
-      const autoMsg = autoDetected?.ruleName
-        ? ` (auto: ${autoDetected.ruleName})`
-        : "";
+      const autoMsg = autoDetected?.ruleName ? ` (auto: ${autoDetected.ruleName})` : "";
       toast.success(`Packed ${inserted.order_number ?? code}${autoMsg}`);
 
       await log({
@@ -301,8 +274,8 @@ function ScanningPage() {
           <Zap className="h-3.5 w-3.5 shrink-0" />
           <span>
             {rules.filter((r) => r.enabled).length} automation rule
-            {rules.filter((r) => r.enabled).length !== 1 ? "s" : ""} active —
-            marketplace and courier will auto-fill on scan.
+            {rules.filter((r) => r.enabled).length !== 1 ? "s" : ""} active — marketplace and courier will auto-fill on
+            scan.
           </span>
         </div>
       )}
@@ -334,11 +307,7 @@ function ScanningPage() {
         />
       </div>
 
-      <form
-        id="scanning-form"
-        onSubmit={handleSubmit}
-        className="rounded-lg border bg-card p-4 shadow-card space-y-3"
-      >
+      <form id="scanning-form" onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
         {/* Auto-detect badge */}
         {autoDetected && (
           <div className="flex items-center gap-2 text-xs text-primary">
@@ -399,10 +368,13 @@ function ScanningPage() {
                 </Badge>
               )}
             </Label>
-            <Select value={marketplace} onValueChange={(v) => {
-              setMarketplace(v);
-              setAutoDetected((prev) => prev ? { ...prev, marketplace: undefined } : null);
-            }}>
+            <Select
+              value={marketplace}
+              onValueChange={(v) => {
+                setMarketplace(v);
+                setAutoDetected((prev) => (prev ? { ...prev, marketplace: undefined } : null));
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -426,10 +398,13 @@ function ScanningPage() {
                 </Badge>
               )}
             </Label>
-            <Select value={courier} onValueChange={(v) => {
-              setCourier(v);
-              setAutoDetected((prev) => prev ? { ...prev, courier: undefined } : null);
-            }}>
+            <Select
+              value={courier}
+              onValueChange={(v) => {
+                setCourier(v);
+                setAutoDetected((prev) => (prev ? { ...prev, courier: undefined } : null));
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -468,9 +443,7 @@ function ScanningPage() {
                 <TableHead>Marketplace</TableHead>
                 <TableHead>Courier</TableHead>
                 <TableHead>{t("scanning.columns.scannedBy")}</TableHead>
-                <TableHead className="text-right">
-                  {t("scanning.columns.result")}
-                </TableHead>
+                <TableHead className="text-right">{t("scanning.columns.result")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -479,32 +452,19 @@ function ScanningPage() {
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {new Date(s.scan_timestamp).toLocaleString()}
                   </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {s.raw_code}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {s.order_number ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {s.marketplace ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {s.courier ?? "—"}
-                  </TableCell>
+                  <TableCell className="font-mono text-xs">{s.raw_code}</TableCell>
+                  <TableCell className="font-mono text-xs">{s.order_number ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{s.marketplace ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{s.courier ?? "—"}</TableCell>
                   <TableCell>{s.user_name}</TableCell>
                   <TableCell className="text-right">
-                    <StatusPill tone={statusToTone(s.status.toLowerCase())}>
-                      {s.status}
-                    </StatusPill>
+                    <StatusPill tone={statusToTone(s.status.toLowerCase())}>{s.status}</StatusPill>
                   </TableCell>
                 </TableRow>
               ))}
               {!records.length && (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-sm text-muted-foreground py-8"
-                  >
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                     No scans yet. Use the form above to record your first scan.
                   </TableCell>
                 </TableRow>
