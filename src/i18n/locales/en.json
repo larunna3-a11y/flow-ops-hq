@@ -450,6 +450,13 @@
       "title": "3 stations report scan mismatches",
       "body": "Pack Station 02 has 4 mismatched scans in the last hour. Review the audit trail to investigate.",
       "open": "Open scan log"
+    },
+    "kpisExt": {
+      "ordersWaiting": "Orders waiting",
+      "ordersAssigned": "Orders assigned",
+      "packedToday": "Orders packed today",
+      "connectedStores": "Connected stores",
+      "lastImport": "Last import"
     }
   },
   "packing": {
