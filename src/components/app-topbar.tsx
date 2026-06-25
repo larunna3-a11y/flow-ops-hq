@@ -14,6 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/theme-provider";
 import { currentUser } from "@/lib/mock-data";
+import { supabase } from "@/integrations/supabase/client";
 
 export function AppTopbar() {
   const { theme, toggle } = useTheme();
@@ -65,7 +66,13 @@ export function AppTopbar() {
           <DropdownMenuItem onClick={() => navigate({ to: "/settings" })}>Settings</DropdownMenuItem>
           <DropdownMenuItem onClick={() => navigate({ to: "/users" })}>Team</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate({ to: "/" })} className="text-destructive focus:text-destructive">
+          <DropdownMenuItem
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate({ to: "/" });
+            }}
+            className="text-destructive focus:text-destructive"
+          >
             <LogOut className="mr-2 h-4 w-4" /> Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { UserPlus, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/page-header";
 import { StatusPill, statusToTone } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
@@ -52,6 +54,48 @@ const roleTone = (r: Role) =>
 
 function UsersPage() {
   const [open, setOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("Packer");
+  const [sending, setSending] = useState(false);
+
+  const sendInvite = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email) {
+      toast.error("Enter an email address.");
+      return;
+    }
+    setSending(true);
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setSending(false);
+      toast.error("You must be signed in.");
+      return;
+    }
+    const { data: membership } = await supabase
+      .from("users")
+      .select("workspace_id")
+      .eq("user_id", auth.user.id)
+      .maybeSingle();
+    if (!membership) {
+      setSending(false);
+      toast.error("No workspace found for your account.");
+      return;
+    }
+    const { error } = await supabase.from("invitations").insert({
+      workspace_id: membership.workspace_id,
+      email,
+      role: inviteRole,
+      invited_by: auth.user.id,
+    });
+    setSending(false);
+    if (error) {
+      toast.error(error.message || "Only Owners can invite members.");
+      return;
+    }
+    toast.success(`Invitation sent to ${email}`);
+    setInviteEmail("");
+    setOpen(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -73,11 +117,17 @@ function UsersPage() {
               <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
                   <Label htmlFor="invite-email">Work email</Label>
-                  <Input id="invite-email" type="email" placeholder="name@company.com" />
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="name@company.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="invite-role">Role</Label>
-                  <Select defaultValue="Packer">
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as Role)}>
                     <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Supervisor">Supervisor</SelectItem>
@@ -89,7 +139,9 @@ function UsersPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button onClick={() => setOpen(false)}>Send invite</Button>
+                <Button onClick={sendInvite} disabled={sending}>
+                  {sending ? "Sending…" : "Send invite"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
