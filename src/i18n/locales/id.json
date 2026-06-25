@@ -450,6 +450,13 @@
       "title": "3 station melaporkan ketidakcocokan scan",
       "body": "Pack Station 02 memiliki 4 scan tidak cocok dalam satu jam terakhir. Tinjau audit trail untuk investigasi.",
       "open": "Buka log scan"
+    },
+    "kpisExt": {
+      "ordersWaiting": "Order menunggu",
+      "ordersAssigned": "Order ditugaskan",
+      "packedToday": "Order dipacking hari ini",
+      "connectedStores": "Toko terhubung",
+      "lastImport": "Impor terakhir"
     }
   },
   "packing": {
