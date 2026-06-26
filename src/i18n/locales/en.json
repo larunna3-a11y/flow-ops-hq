@@ -630,7 +630,8 @@
       "deactivate": "Deactivate user",
       "activate": "Reactivate user",
       "changeRole": "Change role",
-      "remove": "Remove from workspace"
+      "remove": "Remove from workspace",
+      "removeConfirm": "Remove this member from the workspace? They will lose access immediately."
     },
     "toast": {
       "missingEmail": "Enter an email address.",
