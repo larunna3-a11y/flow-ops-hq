@@ -646,7 +646,8 @@
       "roleChanged": "Peran diperbarui.",
       "deactivated": "User dinonaktifkan.",
       "activated": "User diaktifkan kembali.",
-      "resetSent": "Email reset kata sandi terkirim ke {{email}}"
+      "resetSent": "Email reset kata sandi terkirim ke {{email}}",
+      "removed": "Anggota dihapus dari workspace."
     }
   },
   "settings": {
