@@ -630,7 +630,8 @@
       "deactivate": "Nonaktifkan user",
       "activate": "Aktifkan kembali user",
       "changeRole": "Ubah peran",
-      "remove": "Hapus dari workspace"
+      "remove": "Hapus dari workspace",
+      "removeConfirm": "Hapus anggota ini dari workspace? Akses mereka akan langsung dicabut."
     },
     "toast": {
       "missingEmail": "Masukkan alamat email.",
