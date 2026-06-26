@@ -44,6 +44,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useWorkspace, type AppRole } from "@/lib/use-workspace";
+import {
+  inviteUser as inviteUserFn,
+  resendInvitation as resendInvitationFn,
+  removeUser as removeUserFn,
+} from "@/lib/user-management.functions";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({
