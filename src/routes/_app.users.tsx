@@ -172,19 +172,17 @@ function UsersPage() {
       return toast.error(t("users.toast.alreadyInvited"));
 
     setSending(true);
-    const { data: auth } = await supabase.auth.getUser();
-    const { error } = await supabase.from("invitations").insert({
-      workspace_id: workspaceId,
-      email,
-      role: inviteRole,
-      invited_by: auth.user?.id ?? null,
-    });
-    setSending(false);
-    if (error) return toast.error(error.message);
-    toast.success(t("users.toast.sent", { email }));
-    setInviteEmail("");
-    setOpen(false);
-    qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
+    try {
+      await invite({ data: { email, role: inviteRole, redirectTo: `${window.location.origin}/reset-password` } });
+      toast.success(t("users.toast.sent", { email }));
+      setInviteEmail("");
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSending(false);
+    }
   };
 
   const revokeInvitation = async (id: string) => {
@@ -195,14 +193,24 @@ function UsersPage() {
   };
 
   const resendInvitation = async (inv: Invitation) => {
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabase
-      .from("invitations")
-      .update({ status: "pending", expires_at: expires })
-      .eq("id", inv.id);
-    if (error) return toast.error(error.message);
-    toast.success(t("users.toast.resent", { email: inv.email }));
-    qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
+    try {
+      await resend({ data: { invitationId: inv.id, redirectTo: `${window.location.origin}/reset-password` } });
+      toast.success(t("users.toast.resent", { email: inv.email }));
+      qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const removeMember = async (userId: string) => {
+    if (!confirm(t("users.actions.removeConfirm"))) return;
+    try {
+      await removeFn({ data: { userId } });
+      toast.success(t("users.toast.removed"));
+      qc.invalidateQueries({ queryKey: ["members", workspaceId] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const changeRole = async (userId: string, role: AppRole) => {
