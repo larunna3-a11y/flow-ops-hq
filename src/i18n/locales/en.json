@@ -646,7 +646,8 @@
       "roleChanged": "Role updated.",
       "deactivated": "User deactivated.",
       "activated": "User reactivated.",
-      "resetSent": "Password reset email sent to {{email}}"
+      "resetSent": "Password reset email sent to {{email}}",
+      "removed": "Member removed from the workspace."
     }
   },
   "settings": {
