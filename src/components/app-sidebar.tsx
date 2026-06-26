@@ -28,6 +28,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { workspace } from "@/lib/mock-data";
+import { useWorkspace } from "@/lib/use-workspace";
+import { canAccess, type ModuleKey } from "@/lib/permissions";
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -35,28 +37,32 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
   const { t } = useTranslation();
+  const { data: ws } = useWorkspace();
+  const role = ws?.role ?? null;
+  const allow = (m: ModuleKey) => (role ? canAccess(role, m) : true);
 
   const operations = [
-    { title: t("sidebar.items.dashboard"), url: "/dashboard", icon: LayoutDashboard },
-    { title: t("sidebar.items.orders"), url: "/orders", icon: ShoppingCart },
-    { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck },
-    { title: t("sidebar.items.scanning"), url: "/scanning", icon: ScanLine },
-    { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw },
-  ];
+    { title: t("sidebar.items.dashboard"), url: "/dashboard", icon: LayoutDashboard, m: "dashboard" as const },
+    { title: t("sidebar.items.orders"), url: "/orders", icon: ShoppingCart, m: "orders" as const },
+    { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck, m: "packing" as const },
+    { title: t("sidebar.items.scanning"), url: "/scanning", icon: ScanLine, m: "scanning" as const },
+    { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw, m: "returns" as const },
+  ].filter((i) => allow(i.m));
 
   const insights = [
-    { title: t("sidebar.items.reports"), url: "/reports", icon: BarChart3 },
-    { title: t("sidebar.items.imports"), url: "/imports", icon: History },
-  ];
+    { title: t("sidebar.items.reports"), url: "/reports", icon: BarChart3, m: "reports" as const },
+    { title: t("sidebar.items.imports"), url: "/imports", icon: History, m: "imports" as const },
+  ].filter((i) => allow(i.m));
 
   const admin = [
-    { title: t("sidebar.items.stores"), url: "/stores", icon: Store },
-    { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug },
-    { title: t("sidebar.items.users"), url: "/users", icon: Users },
-    { title: t("sidebar.items.settings"), url: "/settings", icon: Settings },
-  ];
+    { title: t("sidebar.items.stores"), url: "/stores", icon: Store, m: "stores" as const },
+    { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug, m: "marketplace" as const },
+    { title: t("sidebar.items.users"), url: "/users", icon: Users, m: "users" as const },
+    { title: t("sidebar.items.settings"), url: "/settings", icon: Settings, m: "settings" as const },
+  ].filter((i) => allow(i.m));
 
-  const renderGroup = (label: string, items: typeof operations) => (
+  type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; m: ModuleKey };
+  const renderGroup = (label: string, items: NavItem[]) => (
     <SidebarGroup>
       {!collapsed && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
       <SidebarGroupContent>
