@@ -101,6 +101,9 @@ function UsersPage() {
   const [inviteRole, setInviteRole] = useState<AppRole>("Packer");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const invite = useServerFn(inviteUserFn);
+  const resend = useServerFn(resendInvitationFn);
+  const removeFn = useServerFn(removeUserFn);
 
   const membersQuery = useQuery({
     enabled: !!workspaceId,
