@@ -61,7 +61,8 @@ export function AppSidebar() {
     { title: t("sidebar.items.settings"), url: "/settings", icon: Settings, m: "settings" as const },
   ].filter((i) => allow(i.m));
 
-  const renderGroup = (label: string, items: typeof operations) => (
+  type NavItem = { title: string; url: string; icon: typeof LayoutDashboard; m: ModuleKey };
+  const renderGroup = (label: string, items: NavItem[]) => (
     <SidebarGroup>
       {!collapsed && <SidebarGroupLabel>{label}</SidebarGroupLabel>}
       <SidebarGroupContent>
