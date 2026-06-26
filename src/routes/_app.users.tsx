@@ -389,6 +389,13 @@ function UsersPage() {
                             {t("users.actions.activate")}
                           </DropdownMenuItem>
                         )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => removeMember(u.user_id)}
+                        >
+                          {t("users.actions.remove")}
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
