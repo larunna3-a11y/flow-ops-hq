@@ -12,16 +12,22 @@ export type ModuleKey =
   | "stores"
   | "marketplace"
   | "users"
-  | "settings";
+  | "settings"
+  | "detection-rules"
+  | "integrations"
+  | "operations"
+  | "automation"
+  | "system";
 
 const ALL: ModuleKey[] = [
   "dashboard", "orders", "packing", "scanning", "returns",
-  "reports", "imports", "stores", "marketplace", "users", "settings",
+  "reports", "imports", "stores", "marketplace", "users", "settings", "detection-rules",
+  "integrations", "operations", "automation", "system",
 ];
 
 const ROLE_MODULES: Record<AppRole, ModuleKey[]> = {
   Owner: ALL,
-  Supervisor: ["dashboard", "orders", "packing", "scanning", "returns", "reports", "imports", "stores"],
+  Supervisor: ["dashboard", "orders", "packing", "scanning", "returns", "reports", "imports", "stores", "detection-rules", "integrations", "operations", "automation", "system"],
   Packer: ["packing", "scanning"],
   "Return Staff": ["returns"],
 };

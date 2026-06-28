@@ -1,6 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import { ScanLine, QrCode, AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ScanLine,
+  QrCode,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Camera,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -12,12 +21,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -30,28 +39,77 @@ import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
 import { usePackingRecords } from "@/lib/use-warehouse-data";
 import { logActivity } from "@/lib/activity.functions";
-
-const MARKETPLACES = ["Shopee", "TikTok Shop", "Tokopedia", "Lazada", "Blibli"];
-const COURIERS = [
-  "J&T Express",
-  "SPX Express",
-  "ID Express",
-  "AnterAja",
-  "SiCepat",
-  "Ninja Xpress",
-  "GoTo Logistics",
-  "Lazada Express",
-];
+import { notify } from "@/lib/notify";
+import { detect, type DetectionResult } from "@/lib/detection";
+import { MARKETPLACES, COURIERS } from "@/lib/use-orders-data";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/_app/scanning")({
   head: () => ({
     meta: [
       { title: "Packing Scan — FlowOps" },
-      { name: "description", content: "Scan barcodes & QR codes to create packing records." },
+      {
+        name: "description",
+        content: "Scan barcodes & QR codes to create packing records.",
+      },
     ],
   }),
   component: ScanningPage,
 });
+
+type OrderItem = {
+  id: string;
+  sku: string;
+  product_name: string;
+  product_variant: string | null;
+  quantity: number;
+  warehouse_location: string | null;
+};
+
+type LookupOrder = {
+  id: string;
+  order_number: string;
+  tracking_number: string | null;
+  marketplace: string | null;
+  courier: string | null;
+  customer_name: string | null;
+  packing_status: string;
+  order_status: string;
+  items: OrderItem[];
+};
+
+type ScanState = {
+  code: string;
+  scanType: "keyboard" | "camera";
+  order: LookupOrder | null;
+  duplicate: { id: string; created_at: string; user_name: string } | null;
+  notFound: boolean;
+  loading: boolean;
+  detection: DetectionResult | null;
+  override: { marketplace: string | null; courier: string | null };
+};
+
+const INITIAL_STATE: ScanState = {
+  code: "",
+  scanType: "keyboard",
+  order: null,
+  duplicate: null,
+  notFound: false,
+  loading: false,
+  detection: null,
+  override: { marketplace: null, courier: null },
+};
+
+function detectDevice() {
+  if (typeof navigator === "undefined") return "Unknown";
+  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+}
 
 function ScanningPage() {
   const { t } = useTranslation();
@@ -60,12 +118,12 @@ function ScanningPage() {
   const log = useServerFn(logActivity);
   const codeRef = useRef<HTMLInputElement>(null);
 
-  const [rawCode, setRawCode] = useState("");
-  const [orderNumber, setOrderNumber] = useState("");
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [marketplace, setMarketplace] = useState<string>(MARKETPLACES[0]);
-  const [courier, setCourier] = useState<string>(COURIERS[0]);
+  const [scan, setScan] = useState<ScanState>(INITIAL_STATE);
   const [submitting, setSubmitting] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+
+  const role = ws.data?.role ?? null;
+  const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
@@ -76,52 +134,119 @@ function ScanningPage() {
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
     const total = todayRecords.length;
-    const packed = todayRecords.filter((r) => r.status === "Packed" || r.status === "Shipped").length;
+    const packed = todayRecords.filter(
+      (r) => r.status === "Packed" || r.status === "Shipped",
+    ).length;
     const pending = todayRecords.filter((r) => r.status === "Pending").length;
     const activeUsers = new Set(todayRecords.map((r) => r.user_id)).size;
     const matchRate = total ? ((packed / total) * 100).toFixed(1) + "%" : "—";
     return { total, packed, pending, activeUsers, matchRate };
   }, [records]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const code = rawCode.trim();
-    if (!code) {
-      toast.error("Enter a barcode or QR value");
-      return;
-    }
+  async function lookup(code: string, scanType: "keyboard" | "camera") {
+    const value = code.trim();
+    if (!value) return;
     const workspace = ws.data?.workspace;
-    const userId = ws.data?.userId;
-    if (!workspace || !userId) {
+    if (!workspace) {
       toast.error("Workspace not loaded");
       return;
     }
+    setScan({ ...INITIAL_STATE, code: value, scanType, loading: true });
 
+    // Run intelligent detection (DB → QR → pattern rules → unknown)
+    let detection: DetectionResult;
+    try {
+      detection = await detect(value, { workspaceId: workspace.id });
+    } catch (err) {
+      toast.error((err as Error).message);
+      setScan((s) => ({ ...s, loading: false }));
+      return;
+    }
+
+    // If detection found an order_number, hydrate full order record + items
+    let order: LookupOrder | null = null;
+    if (detection.method === "database" && detection.orderNumber) {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, order_number, tracking_number, marketplace, courier, customer_name, packing_status, order_status")
+        .eq("workspace_id", workspace.id)
+        .or(
+          `order_number.eq.${detection.orderNumber}${
+            detection.trackingNumber ? `,tracking_number.eq.${detection.trackingNumber}` : ""
+          }`,
+        )
+        .maybeSingle();
+      if (data) {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("id, sku, product_name, product_variant, quantity, warehouse_location")
+          .eq("order_id", data.id)
+          .order("created_at", { ascending: true });
+        order = { ...data, items: items ?? [] };
+      }
+    }
+
+    // Duplicate detection — already packed for this code or tracking
+    const orList = [`raw_code.eq.${value}`];
+    const trackingForDup = order?.tracking_number ?? detection.trackingNumber;
+    if (trackingForDup && trackingForDup !== value)
+      orList.push(`tracking_number.eq.${trackingForDup}`);
+    const { data: dups } = await supabase
+      .from("packing_records")
+      .select("id, created_at, user_name")
+      .eq("workspace_id", workspace.id)
+      .or(orList.join(","))
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const duplicate = dups && dups.length > 0 ? dups[0] : null;
+
+    setScan({
+      code: value,
+      scanType,
+      order,
+      duplicate,
+      notFound: !order,
+      loading: false,
+      detection,
+      override: {
+        marketplace: order?.marketplace ?? detection.marketplace,
+        courier: order?.courier ?? detection.courier,
+      },
+    });
+  }
+
+  function resetScan() {
+    setScan(INITIAL_STATE);
+    setTimeout(() => codeRef.current?.focus(), 50);
+  }
+
+  async function confirmPacking() {
+    const order = scan.order;
+    const workspace = ws.data?.workspace;
+    const userId = ws.data?.userId;
+    if (!order || !workspace || !userId) return;
+    if (scan.duplicate && !canOverrideDuplicate) {
+      toast.error("Duplicate — only Owner or Supervisor can confirm.");
+      return;
+    }
     setSubmitting(true);
     try {
-      // Duplicate check
-      let dupQuery = supabase
-        .from("packing_records")
-        .select("id, raw_code, tracking_number, order_number, created_at")
-        .eq("workspace_id", workspace.id);
-      if (trackingNumber.trim()) {
-        dupQuery = dupQuery.or(`raw_code.eq.${code},tracking_number.eq.${trackingNumber.trim()}`);
-      } else {
-        dupQuery = dupQuery.eq("raw_code", code);
-      }
-      const { data: dups } = await dupQuery.limit(1);
-      if (dups && dups.length > 0) {
-        const d = dups[0];
-        toast.warning(`Duplicate — already scanned at ${new Date(d.created_at).toLocaleString()}`, {
-          description: `Order ${d.order_number ?? "—"} · ${d.raw_code}`,
-        });
-        return;
-      }
-
-      const me = ws.data?.workspace ? await supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle() : null;
-      const userName = me?.data?.full_name || me?.data?.email || "Operator";
-      const role = ws.data?.role ?? null;
+      const me = await supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", userId)
+        .maybeSingle();
+      const userName = me.data?.full_name || me.data?.email || "Operator";
       const nowIso = new Date().toISOString();
+      const device = detectDevice();
+      const finalMarketplace = scan.override.marketplace ?? order.marketplace;
+      const finalCourier = scan.override.courier ?? order.courier;
+      const userOverrode =
+        (scan.detection &&
+          ((scan.detection.marketplace ?? null) !== (finalMarketplace ?? null) ||
+            (scan.detection.courier ?? null) !== (finalCourier ?? null))) ||
+        false;
 
       const { data: inserted, error } = await supabase
         .from("packing_records")
@@ -132,11 +257,11 @@ function ScanningPage() {
           role,
           scan_timestamp: nowIso,
           packing_timestamp: nowIso,
-          raw_code: code,
-          order_number: orderNumber.trim() || null,
-          tracking_number: trackingNumber.trim() || null,
-          marketplace,
-          courier,
+          raw_code: scan.duplicate ? `${scan.code}#${Date.now()}` : scan.code,
+          order_number: order.order_number,
+          tracking_number: order.tracking_number,
+          marketplace: finalMarketplace,
+          courier: finalCourier,
           status: "Packed",
         })
         .select("id, order_number")
@@ -145,32 +270,80 @@ function ScanningPage() {
       if (error) {
         if (error.code === "23505") {
           toast.warning("Duplicate barcode or tracking number");
+          notify({
+            type: "scan.duplicate",
+            title: "Duplicate scan blocked",
+            body: `${order?.order_number ?? "Order"} — tracking ${order?.tracking_number ?? "—"} was already scanned.`,
+            severity: "warning",
+            link: "/scanning",
+            roles: ["Supervisor", "Owner"],
+            metadata: { order_number: order?.order_number, tracking_number: order?.tracking_number },
+          });
         } else {
           toast.error(error.message);
+          notify({
+            type: "scan.failed",
+            title: "Scan failed",
+            body: error.message,
+            severity: "error",
+            link: "/scanning",
+            roles: ["Supervisor"],
+          });
         }
         return;
       }
 
-      toast.success(`Packed ${inserted.order_number ?? code}`);
+      // Move order forward
+      await supabase
+        .from("orders")
+        .update({
+          packing_status: "packed",
+          order_status: "Packed",
+          shipping_status: "Packed",
+        })
+        .eq("id", order.id);
+
       await log({
         data: {
-          action: "packing.scanned",
+          action: "packing.confirmed",
           target_type: "packing_record",
           target_id: inserted.id,
-          metadata: { order_number: inserted.order_number, marketplace, courier },
+          metadata: {
+            order_id: order.id,
+            order_number: order.order_number,
+            tracking_number: order.tracking_number,
+            marketplace: finalMarketplace,
+            courier: finalCourier,
+            device,
+            scan_type: scan.scanType,
+            override_duplicate: !!scan.duplicate,
+            detection_method: scan.detection?.method ?? "unknown",
+            detection_confidence: scan.detection?.confidence ?? 0,
+            detected_marketplace: scan.detection?.marketplace ?? null,
+            detected_courier: scan.detection?.courier ?? null,
+            user_overrode_detection: userOverrode,
+            matched_rules: scan.detection?.matchedRules ?? [],
+          },
         },
       }).catch(() => undefined);
 
-      setRawCode("");
-      setOrderNumber("");
-      setTrackingNumber("");
-      codeRef.current?.focus();
+      toast.success(`Packed ${order.order_number}`);
       qc.invalidateQueries({ queryKey: ["packing_records"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["audit_logs"] });
+      resetScan();
     } finally {
       setSubmitting(false);
     }
   }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    lookup(scan.code, "keyboard");
+  }
+
+  const totalSku = scan.order?.items.length ?? 0;
+  const totalQty = scan.order?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
 
   return (
     <div className="space-y-6">
@@ -179,8 +352,12 @@ function ScanningPage() {
         description={t("scanning.description")}
         actions={
           <>
-            <Button variant="outline" size="sm">{t("common.exportLog")}</Button>
-            <Button size="sm" onClick={() => codeRef.current?.focus()}>{t("scanning.connectScanner")}</Button>
+            <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
+              <Camera className="h-4 w-4" /> Camera
+            </Button>
+            <Button size="sm" onClick={() => codeRef.current?.focus()}>
+              {t("scanning.connectScanner")}
+            </Button>
           </>
         }
       />
@@ -193,55 +370,218 @@ function ScanningPage() {
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="md:col-span-2 space-y-1.5">
-            <Label htmlFor="raw_code">Barcode / QR</Label>
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+          <div className="space-y-1.5">
+            <Label htmlFor="raw_code">Scan barcode / QR / tracking number</Label>
             <Input
               id="raw_code"
               ref={codeRef}
-              value={rawCode}
-              onChange={(e) => setRawCode(e.target.value)}
-              placeholder="Scan or type code…"
+              value={scan.code}
+              onChange={(e) => setScan((s) => ({ ...s, code: e.target.value }))}
+              placeholder="Scan or type code then press Enter…"
               autoFocus
               autoComplete="off"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="order_number">Order #</Label>
-            <Input id="order_number" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="INV/…/MPL/…" autoComplete="off" />
+          <div className="flex items-end">
+            <Button type="submit" disabled={scan.loading || !scan.code.trim()}>
+              {scan.loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              Lookup
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="tracking">Tracking #</Label>
-            <Input id="tracking" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} placeholder="JT…" autoComplete="off" />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Marketplace</Label>
-            <Select value={marketplace} onValueChange={setMarketplace}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="space-y-1.5 md:col-span-2">
-            <Label>Courier</Label>
-            <Select value={courier} onValueChange={setCourier}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COURIERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-3 flex items-end justify-end">
-            <Button type="submit" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              Record scan
+          <div className="flex items-end">
+            <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
+              <Camera className="h-4 w-4" /> Use camera
             </Button>
           </div>
         </div>
       </form>
+
+      {scan.notFound && (
+        <div className="rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            No order matches <span className="font-mono">{scan.code}</span>.
+          </div>
+          <p className="mt-1 text-muted-foreground">
+            Verify the order is imported, or try a different code. Tracking/order numbers must match exactly.
+          </p>
+          {scan.detection && (
+            <div className="mt-3 grid gap-2 text-xs md:grid-cols-4">
+              <div>
+                <div className="text-muted-foreground">Tracking #</div>
+                <div className="font-mono">{scan.detection.trackingNumber ?? scan.code}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Suggested marketplace</div>
+                <div>{scan.detection.marketplace ?? <span className="text-muted-foreground">Unknown</span>}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Suggested courier</div>
+                <div>{scan.detection.courier ?? <span className="text-muted-foreground">Unknown</span>}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Detected via</div>
+                <div className="capitalize">{scan.detection.method} · {Math.round(scan.detection.confidence * 100)}%</div>
+              </div>
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={resetScan}>
+              <RefreshCw className="h-4 w-4" /> Rescan
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const params = new URLSearchParams();
+                if (scan.detection?.trackingNumber) params.set("tracking", scan.detection.trackingNumber);
+                if (scan.detection?.marketplace) params.set("marketplace", scan.detection.marketplace);
+                if (scan.detection?.courier) params.set("courier", scan.detection.courier);
+                window.location.href = `/orders?${params.toString()}`;
+              }}
+            >
+              Create / link order
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {scan.order && (
+        <div className="rounded-lg border bg-card shadow-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold">Packing verification</h3>
+              <StatusPill tone={statusToTone(scan.order.packing_status.toLowerCase())}>
+                {scan.order.packing_status}
+              </StatusPill>
+              {scan.duplicate && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                  <AlertTriangle className="h-3 w-3" /> Already packed{" "}
+                  {new Date(scan.duplicate.created_at).toLocaleString()} by {scan.duplicate.user_name}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {scan.scanType === "camera" ? "Camera scan" : "Keyboard scan"}
+            </span>
+          </div>
+
+          <div className="grid gap-4 p-4 md:grid-cols-4">
+            <div>
+              <div className="text-xs text-muted-foreground">Order #</div>
+              <div className="font-mono text-sm">{scan.order.order_number}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Tracking #</div>
+              <div className="font-mono text-sm">{scan.order.tracking_number ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Marketplace</div>
+              <Select
+                value={scan.override.marketplace ?? "_none"}
+                onValueChange={(v) =>
+                  setScan((s) => ({ ...s, override: { ...s.override, marketplace: v === "_none" ? null : v } }))
+                }
+              >
+                <SelectTrigger className="h-8 mt-1"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">—</SelectItem>
+                  {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Courier</div>
+              <Select
+                value={scan.override.courier ?? "_none"}
+                onValueChange={(v) =>
+                  setScan((s) => ({ ...s, override: { ...s.override, courier: v === "_none" ? null : v } }))
+                }
+              >
+                <SelectTrigger className="h-8 mt-1"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">—</SelectItem>
+                  {COURIERS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-xs text-muted-foreground">Customer</div>
+              <div className="text-sm">{scan.order.customer_name ?? "—"}</div>
+            </div>
+            {scan.detection && (
+              <div className="md:col-span-2">
+                <div className="text-xs text-muted-foreground">Auto-detected via</div>
+                <div className="text-sm capitalize">
+                  {scan.detection.method} · {Math.round(scan.detection.confidence * 100)}% confidence
+                  {scan.detection.matchedRules.length > 0 && (
+                    <span className="ml-2 text-muted-foreground">
+                      ({scan.detection.matchedRules.map((r) => `${r.type}:${r.name}`).join(", ")})
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            <div>
+              <div className="text-xs text-muted-foreground">Total SKUs</div>
+              <div className="text-sm font-semibold">{totalSku}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Total items</div>
+              <div className="text-sm font-semibold">{totalQty}</div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Variant</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead>Location</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scan.order.items.map((it) => (
+                  <TableRow key={it.id}>
+                    <TableCell className="font-mono text-xs">{it.sku}</TableCell>
+                    <TableCell>{it.product_name}</TableCell>
+                    <TableCell className="text-muted-foreground">{it.product_variant ?? "—"}</TableCell>
+                    <TableCell className="text-right">{it.quantity}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{it.warehouse_location ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+                {!scan.order.items.length && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
+                      No items registered for this order yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+            <Button variant="ghost" onClick={resetScan} type="button">
+              <X className="h-4 w-4" /> Cancel
+            </Button>
+            <Button variant="outline" onClick={resetScan} type="button">
+              <RefreshCw className="h-4 w-4" /> Rescan
+            </Button>
+            <Button
+              onClick={confirmPacking}
+              disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate)}
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {scan.duplicate ? "Override & confirm" : "Confirm packing"}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-lg border bg-card shadow-card">
         <div className="flex items-center justify-between border-b px-4 py-3">
@@ -286,6 +626,109 @@ function ScanningPage() {
           </Table>
         </div>
       </div>
+
+      <CameraScanDialog
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onDetected={(value) => {
+          setCameraOpen(false);
+          lookup(value, "camera");
+        }}
+      />
     </div>
+  );
+}
+
+function CameraScanDialog({
+  open,
+  onOpenChange,
+  onDetected,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDetected: (value: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [supported, setSupported] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!open) return;
+    let stream: MediaStream | null = null;
+    let raf = 0;
+    let stopped = false;
+
+    type DetectorCtor = new (opts?: { formats?: string[] }) => {
+      detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>;
+    };
+    const w = window as unknown as { BarcodeDetector?: DetectorCtor };
+    if (!w.BarcodeDetector) {
+      setSupported(false);
+      setError("Your browser does not support the native barcode detector. Use Chrome on Android, or a USB scanner.");
+      return;
+    }
+
+    const detector = new w.BarcodeDetector({
+      formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "itf"],
+    });
+
+    async function start() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        const tick = async () => {
+          if (stopped || !videoRef.current) return;
+          try {
+            const found = await detector.detect(videoRef.current);
+            if (found.length > 0 && found[0].rawValue) {
+              onDetected(found[0].rawValue);
+              return;
+            }
+          } catch {
+            // ignore decoder errors per frame
+          }
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    }
+    start();
+
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [open, onDetected]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Camera scanner</DialogTitle>
+        </DialogHeader>
+        {error && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            {error}
+          </div>
+        )}
+        {supported && (
+          <div className="overflow-hidden rounded-md border bg-black aspect-video">
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

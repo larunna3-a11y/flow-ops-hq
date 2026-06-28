@@ -31,10 +31,12 @@ import {
   MARKETPLACES,
   PACKING_STATUSES,
   useOrders,
+  useOrderItems,
   useStores,
   type Order,
 } from "@/lib/use-orders-data";
 import { useWorkspaceMembers } from "@/lib/use-warehouse-data";
+import { notify } from "@/lib/notify";
 
 export const Route = createFileRoute("/_app/orders")({
   head: () => ({ meta: [{ title: "Orders — FlowOps" }] }),
@@ -72,6 +74,7 @@ function OrdersPage() {
   // Detail + assign dialog
   const [detail, setDetail] = useState<Order | null>(null);
   const [assignTo, setAssignTo] = useState<string>("");
+  const detailItems = useOrderItems(detail?.id);
 
   // Import dialog
   const [importOpen, setImportOpen] = useState(false);
@@ -95,7 +98,7 @@ function OrdersPage() {
         assigned_to: member.id,
         assigned_to_name: member.name,
         assigned_at: nowIso,
-        packing_status: "assigned",
+        packing_status: "ready",
       })
       .eq("id", detail.id);
     if (error) return toast.error(error.message);
@@ -108,6 +111,15 @@ function OrdersPage() {
       assigned_by_name: ws.data?.userId ?? null,
       status: "assigned",
     });
+    notify({
+      type: "packing.assigned",
+      title: "New packing assignment",
+      body: `Order ${detail.order_number} assigned to you.`,
+      severity: "info",
+      link: "/packing",
+      userIds: [member.id],
+      metadata: { order_id: detail.id, order_number: detail.order_number },
+    });
     toast.success(t("orders.toast.assigned", { name: member.name }));
     qc.invalidateQueries({ queryKey: ["orders"] });
     setDetail(null);
@@ -119,7 +131,7 @@ function OrdersPage() {
     if (error) return toast.error(error.message);
     toast.success(t("orders.toast.statusUpdated"));
     qc.invalidateQueries({ queryKey: ["orders"] });
-    if (detail?.id === order.id) setDetail({ ...order, packing_status: next as Order["packing_status"] });
+    if (detail?.id === order.id) setDetail({ ...order, packing_status: next });
   };
 
   const onFile = async (file: File) => {
@@ -154,8 +166,9 @@ function OrdersPage() {
         const src = importMapping[key];
         if (src) obj[key] = String(row[src] ?? "").trim();
       }
-      obj.packing_status = "waiting";
+      obj.packing_status = "new";
       obj.order_status = "new";
+      obj.shipping_status = "Pending";
       return obj;
     }).filter((r) => r.order_number);
 
@@ -356,7 +369,7 @@ function OrdersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div><div className="text-xs text-muted-foreground">{t("orders.columns.marketplace")}</div><div>{detail.marketplace ?? "—"}</div></div>
                 <div><div className="text-xs text-muted-foreground">{t("orders.columns.store")}</div><div>{detail.store_name ?? "—"}</div></div>
-                <div><div className="text-xs text-muted-foreground">{t("orders.columns.customer")}</div><div>{detail.customer_name ?? "—"}</div></div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.customer")}</div><div>{detail.customer_name ?? "—"}{detail.customer_phone ? ` · ${detail.customer_phone}` : ""}</div></div>
                 <div><div className="text-xs text-muted-foreground">{t("orders.columns.courier")}</div><div>{detail.courier ?? "—"}</div></div>
                 <div className="col-span-2"><div className="text-xs text-muted-foreground">{t("orders.columns.tracking")}</div><div className="font-mono">{detail.tracking_number ?? "—"}</div></div>
                 <div><div className="text-xs text-muted-foreground">{t("orders.columns.packing")}</div>
@@ -373,6 +386,37 @@ function OrdersPage() {
                 </div>
                 <div><div className="text-xs text-muted-foreground">{t("orders.columns.assigned")}</div><div>{detail.assigned_to_name ?? t("common.unassigned")}</div></div>
               </div>
+
+              <div className="border-t pt-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">{t("orders.items.title")}</div>
+                {(detailItems.data ?? []).length ? (
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="h-8 text-xs">{t("orders.items.sku")}</TableHead>
+                          <TableHead className="h-8 text-xs">{t("orders.items.product")}</TableHead>
+                          <TableHead className="h-8 text-xs">{t("orders.items.variant")}</TableHead>
+                          <TableHead className="h-8 text-xs text-right">{t("orders.items.qty")}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(detailItems.data ?? []).map((it) => (
+                          <TableRow key={it.id}>
+                            <TableCell className="font-mono text-xs py-1.5">{it.sku}</TableCell>
+                            <TableCell className="text-xs py-1.5">{it.product_name}</TableCell>
+                            <TableCell className="text-xs py-1.5">{it.product_variant ?? "—"}</TableCell>
+                            <TableCell className="text-xs py-1.5 text-right">{it.quantity}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground">{t("orders.items.empty")}</div>
+                )}
+              </div>
+
 
               {isManager && (
                 <div className="space-y-1.5 border-t pt-3">

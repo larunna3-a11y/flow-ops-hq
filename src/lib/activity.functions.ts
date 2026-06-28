@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const logActivity = createServerFn({ method: "POST" })
@@ -18,6 +19,30 @@ export const logActivity = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!u) return { id: null };
 
+    // Best-effort capture of IP + User-Agent from the request headers.
+    let ip: string | null = null;
+    let userAgent: string | null = null;
+    try {
+      const req = getRequest();
+      const h = req?.headers;
+      if (h) {
+        ip =
+          h.get("cf-connecting-ip") ||
+          h.get("x-real-ip") ||
+          (h.get("x-forwarded-for") || "").split(",")[0].trim() ||
+          null;
+        userAgent = h.get("user-agent");
+      }
+    } catch {
+      // ignore — header access is best effort
+    }
+
+    const metadata = {
+      ...(data.metadata ?? {}),
+      ...(ip ? { ip } : {}),
+      ...(userAgent ? { user_agent: userAgent } : {}),
+    } as Record<string, unknown>;
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await supabaseAdmin
       .from("audit_logs")
@@ -27,7 +52,7 @@ export const logActivity = createServerFn({ method: "POST" })
         action: data.action,
         target_type: data.target_type ?? null,
         target_id: data.target_id ?? null,
-        metadata: (data.metadata ?? {}) as never,
+        metadata: metadata as never,
       })
       .select("id")
       .single();

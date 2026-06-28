@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Bell, Moon, Search, Sun, LogOut } from "lucide-react";
+import { Moon, Search, Sun, LogOut } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useServerFn } from "@tanstack/react-start";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { useTheme } from "@/components/theme-provider";
 import { supabase } from "@/integrations/supabase/client";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { NotificationCenter } from "@/components/notification-center";
 import { useQuery } from "@tanstack/react-query";
 import { useWorkspace } from "@/lib/use-workspace";
 import { logActivity } from "@/lib/activity.functions";
@@ -57,10 +58,7 @@ export function AppTopbar() {
       <Button variant="ghost" size="icon" onClick={toggle} aria-label={t("nav.toggleTheme")}>
         {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </Button>
-      <Button variant="ghost" size="icon" className="relative" aria-label={t("nav.notifications")}>
-        <Bell className="h-4 w-4" />
-        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
-      </Button>
+      <NotificationCenter />
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-muted transition-colors">

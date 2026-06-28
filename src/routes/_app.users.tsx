@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { UserPlus, MoreHorizontal, Mail } from "lucide-react";
+import { UserPlus, MoreHorizontal, Mail, Copy, MessageCircle, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,8 +45,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspace, type AppRole } from "@/lib/use-workspace";
 import {
-  inviteUser as inviteUserFn,
-  resendInvitation as resendInvitationFn,
+  createPhoneInvitation as createInviteFn,
+  revokeInvitation as revokeInviteFn,
   removeUser as removeUserFn,
 } from "@/lib/user-management.functions";
 
@@ -68,17 +68,32 @@ type Member = {
   role: AppRole;
   name: string;
   email: string;
+  phone: string | null;
   avatar_color: string;
 };
 
 type Invitation = {
   id: string;
-  email: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
   role: AppRole;
   status: "pending" | "accepted" | "revoked" | "expired";
+  token: string;
   created_at: string;
   expires_at: string;
+  account_expires_at: string | null;
 };
+
+type InviteRole = "Packer" | "Return Staff" | "Supervisor";
+
+const EXPIRATION_OPTIONS: { label: string; days: number | null }[] = [
+  { label: "1 Day", days: 1 },
+  { label: "7 Days", days: 7 },
+  { label: "30 Days", days: 30 },
+  { label: "90 Days", days: 90 },
+  { label: "Permanent", days: null },
+];
 
 const roleTone = (r: AppRole) =>
   r === "Owner" ? "primary" : r === "Supervisor" ? "info" : r === "Packer" ? "success" : "warning";
@@ -86,23 +101,62 @@ const roleTone = (r: AppRole) =>
 const memberStatusTone = (s: Member["status"]) =>
   s === "active" ? "success" : s === "suspended" ? "danger" : "warning";
 
+function inviteEffectiveStatus(inv: Invitation): Invitation["status"] {
+  if (inv.status === "pending" && new Date(inv.expires_at).getTime() < Date.now()) return "expired";
+  return inv.status;
+}
+
 const inviteStatusTone = (s: Invitation["status"]) =>
   s === "pending" ? "warning" : s === "accepted" ? "success" : "danger";
+
+function buildInviteLink(token: string) {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/accept-invite?token=${token}`;
+}
+
+function buildWaMessage(opts: {
+  workspaceName: string;
+  fullName: string;
+  role: string;
+  link: string;
+  expiresAt: string;
+}) {
+  const expiresDate = new Date(opts.expiresAt).toLocaleDateString();
+  return [
+    `Hi ${opts.fullName},`,
+    ``,
+    `You've been invited to join *${opts.workspaceName}* on FlowOps as *${opts.role}*.`,
+    ``,
+    `Accept your invitation here:`,
+    opts.link,
+    ``,
+    `This link expires on ${expiresDate}.`,
+  ].join("\n");
+}
+
+function buildWaUrl(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
+}
 
 function UsersPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const { data: ws } = useWorkspace();
   const workspaceId = ws?.workspace?.id;
+  const workspaceName = ws?.workspace?.name ?? "FlowOps Workspace";
   const isOwner = ws?.role === "Owner";
 
   const [open, setOpen] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<AppRole>("Packer");
+  const [inviteFullName, setInviteFullName] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteRole, setInviteRole] = useState<InviteRole>("Packer");
+  const [inviteExpiration, setInviteExpiration] = useState<string>("30");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
-  const invite = useServerFn(inviteUserFn);
-  const resend = useServerFn(resendInvitationFn);
+
+  const createInvite = useServerFn(createInviteFn);
+  const revokeInvite = useServerFn(revokeInviteFn);
   const removeFn = useServerFn(removeUserFn);
 
   const membersQuery = useQuery({
@@ -111,7 +165,7 @@ function UsersPage() {
     queryFn: async (): Promise<Member[]> => {
       const { data: members } = await supabase
         .from("users")
-        .select("user_id, status, joined_at, last_active_at, workspace_id")
+        .select("user_id, status, joined_at, last_active_at, workspace_id, phone, full_name")
         .eq("workspace_id", workspaceId!);
       if (!members?.length) return [];
       const ids = members.map((m) => m.user_id);
@@ -128,8 +182,9 @@ function UsersPage() {
           joined_at: m.joined_at,
           last_active_at: m.last_active_at,
           role: (r?.role ?? "Packer") as AppRole,
-          name: p?.full_name ?? p?.email?.split("@")[0] ?? "Member",
+          name: (m as any).full_name ?? p?.full_name ?? p?.email?.split("@")[0] ?? "Member",
           email: p?.email ?? "",
+          phone: (m as any).phone ?? null,
           avatar_color: p?.avatar_color ?? "#64748b",
         };
       });
@@ -142,40 +197,64 @@ function UsersPage() {
     queryFn: async (): Promise<Invitation[]> => {
       const { data } = await supabase
         .from("invitations")
-        .select("id, email, role, status, created_at, expires_at")
+        .select(
+          "id, full_name, phone, email, role, status, token, created_at, expires_at, account_expires_at",
+        )
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false });
-      return data ?? [];
+      return (data ?? []) as Invitation[];
     },
   });
 
   const members = membersQuery.data ?? [];
   const invitations = invitationsQuery.data ?? [];
-  const pendingInvitations = invitations.filter((i) => i.status === "pending");
+  const pendingInvitations = invitations.filter(
+    (i) => inviteEffectiveStatus(i) === "pending",
+  );
 
   const filteredMembers = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return members;
     return members.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q),
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.email.toLowerCase().includes(q) ||
+        (m.phone ?? "").toLowerCase().includes(q),
     );
   }, [members, search]);
 
   const sendInvite = async () => {
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email) return toast.error(t("users.toast.missingEmail"));
     if (!workspaceId) return toast.error(t("users.toast.noWorkspace"));
     if (!isOwner) return toast.error(t("users.toast.ownerOnly"));
-    if (members.some((m) => m.email.toLowerCase() === email))
-      return toast.error(t("users.toast.alreadyMember"));
-    if (pendingInvitations.some((i) => i.email.toLowerCase() === email))
-      return toast.error(t("users.toast.alreadyInvited"));
+    const fullName = inviteFullName.trim();
+    const phone = invitePhone.trim();
+    if (!fullName) return toast.error("Enter a full name");
+    if (!phone) return toast.error("Enter a phone number");
+
+    const accountExpiresInDays =
+      inviteExpiration === "permanent" ? null : parseInt(inviteExpiration, 10);
 
     setSending(true);
     try {
-      await invite({ data: { email, role: inviteRole, redirectTo: `${window.location.origin}/reset-password` } });
-      toast.success(t("users.toast.sent", { email }));
-      setInviteEmail("");
+      const inv = await createInvite({
+        data: {
+          fullName,
+          phone,
+          role: inviteRole,
+          accountExpiresInDays,
+        },
+      });
+      const link = buildInviteLink(inv.token);
+      try {
+        await navigator.clipboard.writeText(link);
+        toast.success("Invitation created — link copied to clipboard");
+      } catch {
+        toast.success("Invitation created");
+      }
+      setInviteFullName("");
+      setInvitePhone("");
+      setInviteRole("Packer");
+      setInviteExpiration("30");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
     } catch (e) {
@@ -185,21 +264,36 @@ function UsersPage() {
     }
   };
 
-  const revokeInvitation = async (id: string) => {
-    const { error } = await supabase.from("invitations").update({ status: "revoked" }).eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(t("users.toast.revoked"));
-    qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
-  };
-
-  const resendInvitation = async (inv: Invitation) => {
+  const handleRevoke = async (id: string) => {
     try {
-      await resend({ data: { invitationId: inv.id, redirectTo: `${window.location.origin}/reset-password` } });
-      toast.success(t("users.toast.resent", { email: inv.email }));
+      await revokeInvite({ data: { invitationId: id } });
+      toast.success(t("users.toast.revoked"));
       qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  const copyInviteLink = async (inv: Invitation) => {
+    const link = buildInviteLink(inv.token);
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Invitation link copied");
+    } catch {
+      toast.error("Could not copy link");
+    }
+  };
+
+  const shareViaWhatsApp = (inv: Invitation) => {
+    if (!inv.phone) return toast.error("Invitation has no phone number");
+    const message = buildWaMessage({
+      workspaceName,
+      fullName: inv.full_name ?? "there",
+      role: inv.role,
+      link: buildInviteLink(inv.token),
+      expiresAt: inv.expires_at,
+    });
+    window.open(buildWaUrl(inv.phone, message), "_blank", "noopener,noreferrer");
   };
 
   const removeMember = async (userId: string) => {
@@ -239,14 +333,6 @@ function UsersPage() {
     qc.invalidateQueries({ queryKey: ["members", workspaceId] });
   };
 
-  const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) return toast.error(error.message);
-    toast.success(t("users.toast.resetSent", { email }));
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -261,36 +347,63 @@ function UsersPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("users.dialog.title")}</DialogTitle>
-                <DialogDescription>{t("users.dialog.description")}</DialogDescription>
+                <DialogTitle>Invite a new user</DialogTitle>
+                <DialogDescription>
+                  Enter the team member's name and phone number. We'll generate a secure
+                  invitation link you can copy or send via WhatsApp.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-email">{t("users.dialog.email")}</Label>
+                  <Label htmlFor="invite-name">Full Name</Label>
                   <Input
-                    id="invite-email"
-                    type="email"
-                    placeholder={t("users.dialog.emailPlaceholder")}
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
+                    id="invite-name"
+                    placeholder="e.g. Aulia Rahman"
+                    value={inviteFullName}
+                    onChange={(e) => setInviteFullName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-role">{t("users.dialog.role")}</Label>
-                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
-                    <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Supervisor">Supervisor</SelectItem>
-                      <SelectItem value="Packer">Packer</SelectItem>
-                      <SelectItem value="Return Staff">Return Staff</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="invite-phone">Phone Number</Label>
+                  <Input
+                    id="invite-phone"
+                    type="tel"
+                    placeholder="e.g. +6281234567890"
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite-role">Role</Label>
+                    <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as InviteRole)}>
+                      <SelectTrigger id="invite-role"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Packer">Packer</SelectItem>
+                        <SelectItem value="Return Staff">Return Staff</SelectItem>
+                        <SelectItem value="Supervisor">Supervisor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="invite-expiration">Account Expiration</Label>
+                    <Select value={inviteExpiration} onValueChange={setInviteExpiration}>
+                      <SelectTrigger id="invite-expiration"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {EXPIRATION_OPTIONS.map((o) => (
+                          <SelectItem key={o.label} value={o.days == null ? "permanent" : String(o.days)}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
                 <Button onClick={sendInvite} disabled={sending}>
-                  {sending ? t("common.sending") : t("users.dialog.send")}
+                  {sending ? t("common.sending") : "Create invitation"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -347,7 +460,9 @@ function UsersPage() {
                       </div>
                       <div>
                         <div className="font-medium">{u.name}</div>
-                        <div className="text-xs text-muted-foreground">{u.email}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {u.phone ?? u.email}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
@@ -374,9 +489,6 @@ function UsersPage() {
                           </DropdownMenuItem>
                         ))}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => resetPassword(u.email)}>
-                          {t("users.actions.resetPassword")}
-                        </DropdownMenuItem>
                         {u.status === "active" ? (
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
@@ -418,7 +530,8 @@ function UsersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{t("users.invitations.columns.email")}</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Phone</TableHead>
               <TableHead>{t("users.columns.role")}</TableHead>
               <TableHead>{t("users.columns.status")}</TableHead>
               <TableHead>{t("users.invitations.columns.expires")}</TableHead>
@@ -428,46 +541,77 @@ function UsersPage() {
           <TableBody>
             {invitations.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
                   {invitationsQuery.isLoading ? t("common.loading") : t("users.invitations.empty")}
                 </TableCell>
               </TableRow>
             )}
-            {invitations.map((inv) => (
-              <TableRow key={inv.id}>
-                <TableCell className="font-medium">{inv.email}</TableCell>
-                <TableCell><StatusPill tone={roleTone(inv.role)}>{inv.role}</StatusPill></TableCell>
-                <TableCell><StatusPill tone={inviteStatusTone(inv.status)}>{inv.status}</StatusPill></TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {new Date(inv.expires_at).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={!isOwner}>
-                        <MoreHorizontal className="h-4 w-4" />
+            {invitations.map((inv) => {
+              const effective = inviteEffectiveStatus(inv);
+              const canShare = effective === "pending";
+              return (
+                <TableRow key={inv.id}>
+                  <TableCell className="font-medium">{inv.full_name ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{inv.phone ?? inv.email ?? "—"}</TableCell>
+                  <TableCell><StatusPill tone={roleTone(inv.role)}>{inv.role}</StatusPill></TableCell>
+                  <TableCell><StatusPill tone={inviteStatusTone(effective)}>{effective}</StatusPill></TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(inv.expires_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!canShare}
+                        onClick={() => copyInviteLink(inv)}
+                        title="Copy invitation link"
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        disabled={inv.status === "accepted"}
-                        onClick={() => resendInvitation(inv)}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!canShare || !inv.phone}
+                        onClick={() => shareViaWhatsApp(inv)}
+                        title="Send via WhatsApp"
                       >
-                        {t("users.actions.resend")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        disabled={inv.status !== "pending"}
-                        onClick={() => revokeInvitation(inv.id)}
-                      >
-                        {t("users.actions.revoke")}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" disabled={!isOwner}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={!canShare}
+                            onClick={() => copyInviteLink(inv)}
+                          >
+                            <LinkIcon className="mr-2 h-4 w-4" /> Copy invitation link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!canShare || !inv.phone}
+                            onClick={() => shareViaWhatsApp(inv)}
+                          >
+                            <MessageCircle className="mr-2 h-4 w-4" /> Send via WhatsApp
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            disabled={effective !== "pending"}
+                            onClick={() => handleRevoke(inv.id)}
+                          >
+                            {t("users.actions.revoke")}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

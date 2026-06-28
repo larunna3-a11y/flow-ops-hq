@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Upload } from "lucide-react";
+import { Upload, Plug2, ArrowRight, X, Plus, ServerCog } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { useServerFn } from "@tanstack/react-start";
+import { updatePreferences, updatePlan } from "@/lib/workspace-admin.functions";
 import {
   Select,
   SelectContent,
@@ -22,6 +25,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { setLanguage } from "@/i18n";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_app/settings")({
   head: () => ({
@@ -66,6 +70,16 @@ function SettingsPage() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Preferences + plan
+  const prefs = (workspace as any)?.preferences ?? {};
+  const plan = ((workspace as any)?.plan ?? "free") as "free" | "starter" | "professional" | "enterprise";
+  const [marketplaces, setMarketplaces] = useState<string[]>(prefs.active_marketplaces ?? []);
+  const [couriers, setCouriers] = useState<string[]>(prefs.active_couriers ?? []);
+  const [packStatuses, setPackStatuses] = useState<string[]>(prefs.packing_statuses ?? []);
+  const [returnReasons, setReturnReasons] = useState<string[]>(prefs.return_reasons ?? []);
+  const savePrefs = useServerFn(updatePreferences);
+  const savePlan = useServerFn(updatePlan);
+
   useEffect(() => {
     if (!workspace) return;
     setName(workspace.name);
@@ -75,6 +89,11 @@ function SettingsPage() {
     setLanguageState(workspace.language);
     setCurrency(workspace.currency);
     setLogoUrl(workspace.logo_url);
+    const p = (workspace as any).preferences ?? {};
+    setMarketplaces(p.active_marketplaces ?? []);
+    setCouriers(p.active_couriers ?? []);
+    setPackStatuses(p.packing_statuses ?? []);
+    setReturnReasons(p.return_reasons ?? []);
   }, [workspace]);
 
   const notificationKeys = ["scanMismatch", "slaBreach", "dailySummary"] as const;
@@ -249,6 +268,91 @@ function SettingsPage() {
         </div>
       </section>
 
+      {isOwner && (
+        <section className="rounded-lg border bg-card p-6 shadow-card">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Plug2 className="h-4 w-4" /> Integrations
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md">
+                Connect marketplaces, run manual order imports, and prepare for automatic API sync.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/integrations">
+                Open Integration Center <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {isOwner && (
+        <PreferencesSection
+          marketplaces={marketplaces} setMarketplaces={setMarketplaces}
+          couriers={couriers} setCouriers={setCouriers}
+          packStatuses={packStatuses} setPackStatuses={setPackStatuses}
+          returnReasons={returnReasons} setReturnReasons={setReturnReasons}
+          onSave={async () => {
+            try {
+              await savePrefs({ data: {
+                active_marketplaces: marketplaces,
+                active_couriers: couriers,
+                packing_statuses: packStatuses,
+                return_reasons: returnReasons,
+              }});
+              qc.invalidateQueries({ queryKey: ["current-workspace"] });
+              toast.success("Preferences saved");
+            } catch (e) { toast.error((e as Error).message); }
+          }}
+        />
+      )}
+
+      {isOwner && (
+        <section className="rounded-lg border bg-card p-6 shadow-card">
+          <h3 className="text-sm font-semibold">Subscription plan</h3>
+          <p className="text-xs text-muted-foreground">Current plan placeholder — billing activates when a payment provider is connected.</p>
+          <div className="grid sm:grid-cols-4 gap-3 mt-4">
+            {(["free","starter","professional","enterprise"] as const).map(p => (
+              <button key={p}
+                onClick={async () => {
+                  try { await savePlan({ data: { plan: p } }); qc.invalidateQueries({ queryKey: ["current-workspace"] }); toast.success(`Plan set to ${p}`); }
+                  catch (e) { toast.error((e as Error).message); }
+                }}
+                className={`rounded-md border p-4 text-left transition ${plan === p ? "border-primary ring-2 ring-primary/30" : "hover:border-foreground/20"}`}>
+                <div className="text-sm font-semibold capitalize">{p}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {p === "free" && "Up to 3 users, manual imports."}
+                  {p === "starter" && "Up to 10 users, scheduled reports."}
+                  {p === "professional" && "Up to 50 users, API access."}
+                  {p === "enterprise" && "Unlimited users, priority support."}
+                </div>
+                {plan === p && <Badge variant="secondary" className="mt-2">Current</Badge>}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {isOwner && (
+        <section className="rounded-lg border bg-card p-6 shadow-card">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <ServerCog className="h-4 w-4" /> System status
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md">
+                Database health, manual backups, workspace exports, and API tokens.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/system">Open <ArrowRight className="h-3.5 w-3.5" /></Link>
+            </Button>
+          </div>
+        </section>
+      )}
+
       <section className="rounded-lg border bg-card p-6 shadow-card">
         <h3 className="text-sm font-semibold">{t("settings.notifications.title")}</h3>
         <p className="text-xs text-muted-foreground">{t("settings.notifications.subtitle")}</p>
@@ -273,5 +377,63 @@ function SettingsPage() {
         </section>
       )}
     </div>
+  );
+}
+
+function TagEditor({ values, onChange, placeholder }: { values: string[]; onChange: (v: string[]) => void; placeholder: string }) {
+  const [input, setInput] = useState("");
+  const add = () => {
+    const v = input.trim();
+    if (!v || values.includes(v)) return;
+    onChange([...values, v]); setInput("");
+  };
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {values.map(v => (
+          <Badge key={v} variant="secondary" className="gap-1 pl-2 pr-1">
+            {v}
+            <button onClick={() => onChange(values.filter(x => x !== v))} className="rounded hover:bg-muted-foreground/20 p-0.5">
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Input value={input} placeholder={placeholder} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+        <Button type="button" variant="outline" size="icon" onClick={add}><Plus className="h-4 w-4" /></Button>
+      </div>
+    </div>
+  );
+}
+
+function PreferencesSection({
+  marketplaces, setMarketplaces, couriers, setCouriers,
+  packStatuses, setPackStatuses, returnReasons, setReturnReasons, onSave,
+}: {
+  marketplaces: string[]; setMarketplaces: (v: string[]) => void;
+  couriers: string[]; setCouriers: (v: string[]) => void;
+  packStatuses: string[]; setPackStatuses: (v: string[]) => void;
+  returnReasons: string[]; setReturnReasons: (v: string[]) => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="rounded-lg border bg-card p-6 shadow-card">
+      <h3 className="text-sm font-semibold">Workspace catalog</h3>
+      <p className="text-xs text-muted-foreground">Active marketplaces, couriers, packing statuses, and return reasons used across the app.</p>
+      <div className="grid gap-5 mt-4 md:grid-cols-2">
+        <div className="space-y-2"><Label>Active marketplaces</Label>
+          <TagEditor values={marketplaces} onChange={setMarketplaces} placeholder="Add marketplace…" /></div>
+        <div className="space-y-2"><Label>Active couriers</Label>
+          <TagEditor values={couriers} onChange={setCouriers} placeholder="Add courier…" /></div>
+        <div className="space-y-2"><Label>Packing statuses</Label>
+          <TagEditor values={packStatuses} onChange={setPackStatuses} placeholder="e.g. ready" /></div>
+        <div className="space-y-2"><Label>Return reasons</Label>
+          <TagEditor values={returnReasons} onChange={setReturnReasons} placeholder="e.g. Damaged" /></div>
+      </div>
+      <Separator className="my-5" />
+      <div className="flex justify-end"><Button size="sm" onClick={onSave}>Save preferences</Button></div>
+    </section>
   );
 }

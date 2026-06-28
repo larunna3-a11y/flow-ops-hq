@@ -2,17 +2,15 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   PackageCheck,
-  ScanLine,
   RotateCcw,
   BarChart3,
   Users,
   Settings,
   Boxes,
-  Store,
   ShoppingCart,
-  Plug,
   History,
 } from "lucide-react";
+
 import { useTranslation } from "react-i18next";
 import {
   Sidebar,
@@ -27,8 +25,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { workspace } from "@/lib/mock-data";
 import { useWorkspace } from "@/lib/use-workspace";
+import { useWorkspaceMembers } from "@/lib/use-warehouse-data";
 import { canAccess, type ModuleKey } from "@/lib/permissions";
 
 export function AppSidebar() {
@@ -38,25 +36,27 @@ export function AppSidebar() {
   const isActive = (path: string) => pathname === path || pathname.startsWith(path + "/");
   const { t } = useTranslation();
   const { data: ws } = useWorkspace();
+  const { data: members } = useWorkspaceMembers();
   const role = ws?.role ?? null;
   const allow = (m: ModuleKey) => (role ? canAccess(role, m) : true);
+  const workspaceName = ws?.workspace?.name ?? "Workspace";
+  const workspacePlan = (ws?.workspace as { plan?: string } | null)?.plan ?? "Free";
+  const memberCount = members?.length ?? 0;
 
   const operations = [
     { title: t("sidebar.items.dashboard"), url: "/dashboard", icon: LayoutDashboard, m: "dashboard" as const },
+    { title: t("sidebar.items.imports"), url: "/imports", icon: History, m: "imports" as const },
     { title: t("sidebar.items.orders"), url: "/orders", icon: ShoppingCart, m: "orders" as const },
     { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck, m: "packing" as const },
-    { title: t("sidebar.items.scanning"), url: "/scanning", icon: ScanLine, m: "scanning" as const },
     { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw, m: "returns" as const },
   ].filter((i) => allow(i.m));
 
+
   const insights = [
     { title: t("sidebar.items.reports"), url: "/reports", icon: BarChart3, m: "reports" as const },
-    { title: t("sidebar.items.imports"), url: "/imports", icon: History, m: "imports" as const },
   ].filter((i) => allow(i.m));
 
   const admin = [
-    { title: t("sidebar.items.stores"), url: "/stores", icon: Store, m: "stores" as const },
-    { title: t("sidebar.items.marketplace"), url: "/marketplace", icon: Plug, m: "marketplace" as const },
     { title: t("sidebar.items.users"), url: "/users", icon: Users, m: "users" as const },
     { title: t("sidebar.items.settings"), url: "/settings", icon: Settings, m: "settings" as const },
   ].filter((i) => allow(i.m));
@@ -92,7 +92,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="flex flex-col leading-tight">
               <span className="text-sm font-semibold tracking-tight">FlowOps</span>
-              <span className="text-[11px] text-muted-foreground truncate">{workspace.name}</span>
+              <span className="text-[11px] text-muted-foreground truncate">{workspaceName}</span>
             </div>
           )}
         </Link>
@@ -107,8 +107,8 @@ export function AppSidebar() {
       <SidebarFooter>
         {!collapsed && (
           <div className="rounded-md border bg-card p-3 text-xs">
-            <div className="font-medium text-foreground">{t("sidebar.plan", { plan: workspace.plan })}</div>
-            <div className="mt-0.5 text-muted-foreground">{t("sidebar.membersCount", { count: workspace.members })}</div>
+            <div className="font-medium text-foreground">{t("sidebar.plan", { plan: workspacePlan })}</div>
+            <div className="mt-0.5 text-muted-foreground">{t("sidebar.membersCount", { count: memberCount })}</div>
           </div>
         )}
       </SidebarFooter>
