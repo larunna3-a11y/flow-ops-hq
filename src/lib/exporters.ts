@@ -28,3 +28,23 @@ export function exportPdf<T extends Record<string, unknown>>(
   autoTable(doc, { head, body, startY: 26, styles: { fontSize: 8 } });
   doc.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
 }
+
+export function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  const esc = (v: unknown) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [cols.join(",")];
+  for (const r of rows) lines.push(cols.map((c) => esc(r[c])).join(","));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

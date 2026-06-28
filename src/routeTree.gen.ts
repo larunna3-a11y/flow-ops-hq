@@ -14,9 +14,11 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FeaturesRouteImport } from './routes/features'
+import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
+import { Route as AppSystemRouteImport } from './routes/_app.system'
 import { Route as AppStoresRouteImport } from './routes/_app.stores'
 import { Route as AppSettingsRouteImport } from './routes/_app.settings'
 import { Route as AppScanningRouteImport } from './routes/_app.scanning'
@@ -24,9 +26,13 @@ import { Route as AppReturnsRouteImport } from './routes/_app.returns'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppPackingRouteImport } from './routes/_app.packing'
 import { Route as AppOrdersRouteImport } from './routes/_app.orders'
+import { Route as AppOperationsRouteImport } from './routes/_app.operations'
 import { Route as AppMarketplaceRouteImport } from './routes/_app.marketplace'
+import { Route as AppIntegrationsRouteImport } from './routes/_app.integrations'
 import { Route as AppImportsRouteImport } from './routes/_app.imports'
+import { Route as AppDetectionRulesRouteImport } from './routes/_app.detection-rules'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
+import { Route as AppAutomationRouteImport } from './routes/_app.automation'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -53,6 +59,11 @@ const FeaturesRoute = FeaturesRouteImport.update({
   path: '/features',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AcceptInviteRoute = AcceptInviteRouteImport.update({
+  id: '/accept-invite',
+  path: '/accept-invite',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -65,6 +76,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppUsersRoute = AppUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSystemRoute = AppSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
   getParentRoute: () => AppRoute,
 } as any)
 const AppStoresRoute = AppStoresRouteImport.update({
@@ -102,9 +118,19 @@ const AppOrdersRoute = AppOrdersRouteImport.update({
   path: '/orders',
   getParentRoute: () => AppRoute,
 } as any)
+const AppOperationsRoute = AppOperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMarketplaceRoute = AppMarketplaceRouteImport.update({
   id: '/marketplace',
   path: '/marketplace',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppIntegrationsRoute = AppIntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
   getParentRoute: () => AppRoute,
 } as any)
 const AppImportsRoute = AppImportsRouteImport.update({
@@ -112,22 +138,37 @@ const AppImportsRoute = AppImportsRouteImport.update({
   path: '/imports',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDetectionRulesRoute = AppDetectionRulesRouteImport.update({
+  id: '/detection-rules',
+  path: '/detection-rules',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAutomationRoute = AppAutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/automation': typeof AppAutomationRoute
   '/dashboard': typeof AppDashboardRoute
+  '/detection-rules': typeof AppDetectionRulesRoute
   '/imports': typeof AppImportsRoute
+  '/integrations': typeof AppIntegrationsRoute
   '/marketplace': typeof AppMarketplaceRoute
+  '/operations': typeof AppOperationsRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -135,18 +176,24 @@ export interface FileRoutesByFullPath {
   '/scanning': typeof AppScanningRoute
   '/settings': typeof AppSettingsRoute
   '/stores': typeof AppStoresRoute
+  '/system': typeof AppSystemRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/automation': typeof AppAutomationRoute
   '/dashboard': typeof AppDashboardRoute
+  '/detection-rules': typeof AppDetectionRulesRoute
   '/imports': typeof AppImportsRoute
+  '/integrations': typeof AppIntegrationsRoute
   '/marketplace': typeof AppMarketplaceRoute
+  '/operations': typeof AppOperationsRoute
   '/orders': typeof AppOrdersRoute
   '/packing': typeof AppPackingRoute
   '/reports': typeof AppReportsRoute
@@ -154,20 +201,26 @@ export interface FileRoutesByTo {
   '/scanning': typeof AppScanningRoute
   '/settings': typeof AppSettingsRoute
   '/stores': typeof AppStoresRoute
+  '/system': typeof AppSystemRoute
   '/users': typeof AppUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/accept-invite': typeof AcceptInviteRoute
   '/features': typeof FeaturesRoute
   '/login': typeof LoginRoute
   '/pricing': typeof PricingRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/_app/automation': typeof AppAutomationRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/detection-rules': typeof AppDetectionRulesRoute
   '/_app/imports': typeof AppImportsRoute
+  '/_app/integrations': typeof AppIntegrationsRoute
   '/_app/marketplace': typeof AppMarketplaceRoute
+  '/_app/operations': typeof AppOperationsRoute
   '/_app/orders': typeof AppOrdersRoute
   '/_app/packing': typeof AppPackingRoute
   '/_app/reports': typeof AppReportsRoute
@@ -175,20 +228,26 @@ export interface FileRoutesById {
   '/_app/scanning': typeof AppScanningRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/stores': typeof AppStoresRoute
+  '/_app/system': typeof AppSystemRoute
   '/_app/users': typeof AppUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accept-invite'
     | '/features'
     | '/login'
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/automation'
     | '/dashboard'
+    | '/detection-rules'
     | '/imports'
+    | '/integrations'
     | '/marketplace'
+    | '/operations'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -196,18 +255,24 @@ export interface FileRouteTypes {
     | '/scanning'
     | '/settings'
     | '/stores'
+    | '/system'
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accept-invite'
     | '/features'
     | '/login'
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/automation'
     | '/dashboard'
+    | '/detection-rules'
     | '/imports'
+    | '/integrations'
     | '/marketplace'
+    | '/operations'
     | '/orders'
     | '/packing'
     | '/reports'
@@ -215,19 +280,25 @@ export interface FileRouteTypes {
     | '/scanning'
     | '/settings'
     | '/stores'
+    | '/system'
     | '/users'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/accept-invite'
     | '/features'
     | '/login'
     | '/pricing'
     | '/reset-password'
     | '/signup'
+    | '/_app/automation'
     | '/_app/dashboard'
+    | '/_app/detection-rules'
     | '/_app/imports'
+    | '/_app/integrations'
     | '/_app/marketplace'
+    | '/_app/operations'
     | '/_app/orders'
     | '/_app/packing'
     | '/_app/reports'
@@ -235,12 +306,14 @@ export interface FileRouteTypes {
     | '/_app/scanning'
     | '/_app/settings'
     | '/_app/stores'
+    | '/_app/system'
     | '/_app/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  AcceptInviteRoute: typeof AcceptInviteRoute
   FeaturesRoute: typeof FeaturesRoute
   LoginRoute: typeof LoginRoute
   PricingRoute: typeof PricingRoute
@@ -285,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeaturesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accept-invite': {
+      id: '/accept-invite'
+      path: '/accept-invite'
+      fullPath: '/accept-invite'
+      preLoaderRoute: typeof AcceptInviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -304,6 +384,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof AppUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/system': {
+      id: '/_app/system'
+      path: '/system'
+      fullPath: '/system'
+      preLoaderRoute: typeof AppSystemRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/stores': {
@@ -355,11 +442,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppOrdersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/operations': {
+      id: '/_app/operations'
+      path: '/operations'
+      fullPath: '/operations'
+      preLoaderRoute: typeof AppOperationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/marketplace': {
       id: '/_app/marketplace'
       path: '/marketplace'
       fullPath: '/marketplace'
       preLoaderRoute: typeof AppMarketplaceRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/integrations': {
+      id: '/_app/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof AppIntegrationsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/imports': {
@@ -369,6 +470,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppImportsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/detection-rules': {
+      id: '/_app/detection-rules'
+      path: '/detection-rules'
+      fullPath: '/detection-rules'
+      preLoaderRoute: typeof AppDetectionRulesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -376,13 +484,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/automation': {
+      id: '/_app/automation'
+      path: '/automation'
+      fullPath: '/automation'
+      preLoaderRoute: typeof AppAutomationRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppAutomationRoute: typeof AppAutomationRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDetectionRulesRoute: typeof AppDetectionRulesRoute
   AppImportsRoute: typeof AppImportsRoute
+  AppIntegrationsRoute: typeof AppIntegrationsRoute
   AppMarketplaceRoute: typeof AppMarketplaceRoute
+  AppOperationsRoute: typeof AppOperationsRoute
   AppOrdersRoute: typeof AppOrdersRoute
   AppPackingRoute: typeof AppPackingRoute
   AppReportsRoute: typeof AppReportsRoute
@@ -390,13 +509,18 @@ interface AppRouteChildren {
   AppScanningRoute: typeof AppScanningRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppStoresRoute: typeof AppStoresRoute
+  AppSystemRoute: typeof AppSystemRoute
   AppUsersRoute: typeof AppUsersRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAutomationRoute: AppAutomationRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDetectionRulesRoute: AppDetectionRulesRoute,
   AppImportsRoute: AppImportsRoute,
+  AppIntegrationsRoute: AppIntegrationsRoute,
   AppMarketplaceRoute: AppMarketplaceRoute,
+  AppOperationsRoute: AppOperationsRoute,
   AppOrdersRoute: AppOrdersRoute,
   AppPackingRoute: AppPackingRoute,
   AppReportsRoute: AppReportsRoute,
@@ -404,6 +528,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppScanningRoute: AppScanningRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppStoresRoute: AppStoresRoute,
+  AppSystemRoute: AppSystemRoute,
   AppUsersRoute: AppUsersRoute,
 }
 
@@ -412,6 +537,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  AcceptInviteRoute: AcceptInviteRoute,
   FeaturesRoute: FeaturesRoute,
   LoginRoute: LoginRoute,
   PricingRoute: PricingRoute,
@@ -421,13 +547,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

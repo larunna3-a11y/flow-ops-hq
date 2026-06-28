@@ -12,8 +12,6 @@ export function MarketingShell({ children }: { children: ReactNode }) {
 
   const navLinks = [
     { label: t("nav.home"), to: "/" as const },
-    { label: t("nav.features"), to: "/features" as const },
-    { label: t("nav.pricing"), to: "/pricing" as const },
   ];
 
   return (
@@ -109,8 +107,6 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             <FooterCol
               title={t("footer.product")}
               links={[
-                { label: t("nav.features"), to: "/features" },
-                { label: t("nav.pricing"), to: "/pricing" },
                 { label: t("nav.login"), to: "/login" },
                 { label: t("nav.getStarted"), to: "/signup" },
               ]}
@@ -118,9 +114,9 @@ export function MarketingShell({ children }: { children: ReactNode }) {
             <FooterCol
               title={t("footer.solutions")}
               links={[
-                { label: t("footer.ecommerceBrands"), to: "/features" },
-                { label: t("footer.marketplaceSellers"), to: "/features" },
-                { label: t("footer.warehouseTeams"), to: "/features" },
+                { label: t("footer.ecommerceBrands"), to: "/" },
+                { label: t("footer.marketplaceSellers"), to: "/" },
+                { label: t("footer.warehouseTeams"), to: "/" },
               ]}
             />
             <FooterCol

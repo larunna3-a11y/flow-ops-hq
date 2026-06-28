@@ -398,7 +398,7 @@
       "scanning": "Scan Tracking",
       "returns": "Returns",
       "reports": "Reports",
-      "imports": "Sync History",
+      "imports": "Import Orders",
       "stores": "Connected Stores",
       "marketplace": "Marketplace Connections",
       "users": "Users",
@@ -457,6 +457,13 @@
       "packedToday": "Orders packed today",
       "connectedStores": "Connected stores",
       "lastImport": "Last import"
+    },
+    "orders": {
+      "total": "Total orders",
+      "ready": "Ready to pack",
+      "packing": "Packing",
+      "packed": "Packed",
+      "shipped": "Shipped"
     }
   },
   "packing": {
@@ -753,11 +760,24 @@
       "created": "Created"
     },
     "status": {
-      "waiting": "Waiting",
-      "assigned": "Assigned",
+      "new": "New Order",
+      "ready": "Ready to Pack",
       "packing": "Packing",
       "packed": "Packed",
-      "shipped": "Shipped"
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "returned": "Returned",
+      "cancelled": "Cancelled",
+      "waiting": "New Order",
+      "assigned": "Ready to Pack"
+    },
+    "items": {
+      "title": "Order items",
+      "sku": "SKU",
+      "product": "Product",
+      "variant": "Variant",
+      "qty": "Qty",
+      "empty": "No items recorded for this order yet."
     },
     "assign": {
       "label": "Assign to packer",

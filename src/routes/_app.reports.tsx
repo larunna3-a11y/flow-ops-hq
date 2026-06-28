@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Download, FileText, FileSpreadsheet } from "lucide-react";
+import { Download, FileText, FileSpreadsheet, FileDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/page-header";
@@ -31,15 +31,33 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { usePackingRecords, useWorkspaceMembers } from "@/lib/use-warehouse-data";
-import { exportPdf, exportXlsx } from "@/lib/exporters";
+import { usePackingRecords, useReturns, useWorkspaceMembers } from "@/lib/use-warehouse-data";
+import { exportCsv, exportPdf, exportXlsx } from "@/lib/exporters";
 import { logActivity } from "@/lib/activity.functions";
+import { notify } from "@/lib/notify";
 
 const MARKETPLACES = ["Shopee", "TikTok Shop", "Tokopedia", "Lazada", "Blibli"];
 const COURIERS = [
   "J&T Express", "SPX Express", "ID Express", "AnterAja", "SiCepat", "Ninja Xpress", "GoTo Logistics", "Lazada Express",
 ];
 const STATUSES = ["Pending", "Packed", "Shipped", "Cancelled"];
+
+type Preset = "today" | "yesterday" | "week" | "month" | "custom";
+function presetRange(p: Preset): { from: string; to: string } {
+  const now = new Date();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  if (p === "today") return { from: iso(now), to: iso(now) };
+  if (p === "yesterday") {
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    return { from: iso(y), to: iso(y) };
+  }
+  if (p === "week") {
+    const s = new Date(now); s.setDate(now.getDate() - now.getDay());
+    return { from: iso(s), to: iso(now) };
+  }
+  const s = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: iso(s), to: iso(now) };
+}
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({
@@ -59,14 +77,15 @@ const chartTooltip = {
 function ReportsPage() {
   const { t } = useTranslation();
   const log = useServerFn(logActivity);
-  const today = new Date();
-  const last30 = new Date(today); last30.setDate(today.getDate() - 30);
-  const [from, setFrom] = useState(last30.toISOString().slice(0, 10));
-  const [to, setTo] = useState(today.toISOString().slice(0, 10));
+  const initial = presetRange("month");
+  const [preset, setPreset] = useState<Preset>("month");
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
   const [marketplace, setMarketplace] = useState("all");
   const [courier, setCourier] = useState("all");
   const [userId, setUserId] = useState("all");
   const [status, setStatus] = useState("all");
+  const [tab, setTab] = useState("packing");
 
   const { data: members = [] } = useWorkspaceMembers();
   const { data: records = [] } = usePackingRecords({
@@ -77,49 +96,144 @@ function ReportsPage() {
     userId,
     status,
   });
+  const { data: allReturns = [] } = useReturns();
+  const returns = useMemo(() => {
+    const fromTs = new Date(from).getTime();
+    const toTs = new Date(to).getTime() + 86400000;
+    return allReturns.filter((r) => {
+      const t = new Date(r.created_at).getTime();
+      if (t < fromTs || t >= toTs) return false;
+      if (marketplace !== "all" && r.marketplace !== marketplace) return false;
+      if (courier !== "all" && r.courier !== courier) return false;
+      return true;
+    });
+  }, [allReturns, from, to, marketplace, courier]);
+
+  function applyPreset(p: Preset) {
+    setPreset(p);
+    if (p === "custom") return;
+    const r = presetRange(p);
+    setFrom(r.from);
+    setTo(r.to);
+  }
+
+  // Packing KPIs
+  const packingKpis = useMemo(() => {
+    const total = records.length;
+    const packed = records.filter((r) => r.status === "Packed" || r.status === "Shipped").length;
+    const pending = records.filter((r) => r.status === "Pending").length;
+    const failed = records.filter((r) => r.status === "Cancelled").length;
+    const times: number[] = [];
+    for (const r of records) {
+      if (r.packing_timestamp && r.scan_timestamp) {
+        const d = new Date(r.packing_timestamp).getTime() - new Date(r.scan_timestamp).getTime();
+        if (d > 0 && d < 1000 * 60 * 60 * 8) times.push(d);
+      }
+    }
+    const avgMs = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+    return { total, packed, pending, failed, avgSec: Math.round(avgMs / 1000) };
+  }, [records]);
+
+  // Return KPIs / breakdowns
+  const returnKpis = useMemo(() => {
+    const total = returns.length;
+    const totalOrders = records.length || 1;
+    const rate = (total / totalOrders) * 100;
+    let restocked = 0, damaged = 0, courierClaim = 0, supplierClaim = 0;
+    const reasonMap = new Map<string, number>();
+    for (const r of returns) {
+      const res = (r.resolution ?? r.status ?? "").toLowerCase();
+      if (res.includes("restock")) restocked += 1;
+      if (res.includes("damage")) damaged += 1;
+      if (res.includes("courier")) courierClaim += 1;
+      if (res.includes("supplier")) supplierClaim += 1;
+      const reason = r.reason || "Unspecified";
+      reasonMap.set(reason, (reasonMap.get(reason) ?? 0) + 1);
+    }
+    const reasons = Array.from(reasonMap.entries()).map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+    return { total, rate, restocked, damaged, courierClaim, supplierClaim, reasons };
+  }, [returns, records.length]);
 
   const marketplaceAgg = useMemo(() => {
-    const m = new Map<string, { name: string; orders: number; packed: number }>();
+    const m = new Map<string, { name: string; orders: number; packed: number; returns: number }>();
     for (const r of records) {
       const k = r.marketplace ?? "Unknown";
-      const e = m.get(k) ?? { name: k, orders: 0, packed: 0 };
+      const e = m.get(k) ?? { name: k, orders: 0, packed: 0, returns: 0 };
       e.orders += 1;
       if (r.status === "Packed" || r.status === "Shipped") e.packed += 1;
       m.set(k, e);
     }
+    for (const r of returns) {
+      const k = r.marketplace ?? "Unknown";
+      const e = m.get(k) ?? { name: k, orders: 0, packed: 0, returns: 0 };
+      e.returns += 1;
+      m.set(k, e);
+    }
     return Array.from(m.values());
-  }, [records]);
+  }, [records, returns]);
 
   const courierAgg = useMemo(() => {
-    const m = new Map<string, { name: string; shipments: number; shipped: number }>();
+    const m = new Map<string, { name: string; shipments: number; shipped: number; returns: number; failed: number }>();
     for (const r of records) {
       const k = r.courier ?? "Unknown";
-      const e = m.get(k) ?? { name: k, shipments: 0, shipped: 0 };
+      const e = m.get(k) ?? { name: k, shipments: 0, shipped: 0, returns: 0, failed: 0 };
       e.shipments += 1;
       if (r.status === "Shipped") e.shipped += 1;
+      if (r.status === "Cancelled") e.failed += 1;
+      m.set(k, e);
+    }
+    for (const r of returns) {
+      const k = r.courier ?? "Unknown";
+      const e = m.get(k) ?? { name: k, shipments: 0, shipped: 0, returns: 0, failed: 0 };
+      e.returns += 1;
       m.set(k, e);
     }
     return Array.from(m.values()).sort((a, b) => b.shipments - a.shipments);
-  }, [records]);
+  }, [records, returns]);
 
   const productivity = useMemo(() => {
-    const m = new Map<string, { name: string; role: string; packed: number }>();
+    const m = new Map<string, { id: string; name: string; role: string; packed: number; avgSec: number; samples: number }>();
+    const timeAcc = new Map<string, { sum: number; n: number }>();
     for (const r of records) {
       if (r.status === "Pending" || r.status === "Cancelled") continue;
       const k = r.user_id;
-      const e = m.get(k) ?? { name: r.user_name, role: r.role ?? "—", packed: 0 };
+      const e = m.get(k) ?? { id: k, name: r.user_name, role: r.role ?? "—", packed: 0, avgSec: 0, samples: 0 };
       e.packed += 1;
       m.set(k, e);
+      if (r.packing_timestamp && r.scan_timestamp) {
+        const d = new Date(r.packing_timestamp).getTime() - new Date(r.scan_timestamp).getTime();
+        if (d > 0 && d < 1000 * 60 * 60 * 8) {
+          const t = timeAcc.get(k) ?? { sum: 0, n: 0 };
+          t.sum += d; t.n += 1; timeAcc.set(k, t);
+        }
+      }
+    }
+    for (const [k, t] of timeAcc) {
+      const e = m.get(k); if (e) { e.avgSec = Math.round(t.sum / t.n / 1000); e.samples = t.n; }
     }
     return Array.from(m.values()).sort((a, b) => b.packed - a.packed);
   }, [records]);
 
+  const returnStaffProductivity = useMemo(() => {
+    const m = new Map<string, { name: string; processed: number; completed: number }>();
+    for (const r of returns) {
+      const k = r.inspector_id || r.assigned_to || "unassigned";
+      const name = r.inspector_name || r.assigned_to_name || "Unassigned";
+      const e = m.get(k) ?? { name, processed: 0, completed: 0 };
+      e.processed += 1;
+      if (r.completed_at) e.completed += 1;
+      m.set(k, e);
+    }
+    return Array.from(m.values()).sort((a, b) => b.processed - a.processed);
+  }, [returns]);
+
   const trendData = useMemo(() => {
-    const days: { day: string; packed: number }[] = [];
+    const days: { day: string; packed: number; returns: number }[] = [];
     const start = new Date(from);
     const end = new Date(to);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      days.push({ day: d.toISOString().slice(5, 10), packed: 0 });
+      days.push({ day: d.toISOString().slice(5, 10), packed: 0, returns: 0 });
     }
     for (const r of records) {
       if (r.status === "Pending" || r.status === "Cancelled") continue;
@@ -127,11 +241,38 @@ function ReportsPage() {
       const d = days.find((x) => x.day === key);
       if (d) d.packed += 1;
     }
+    for (const r of returns) {
+      const key = r.created_at.slice(5, 10);
+      const d = days.find((x) => x.day === key);
+      if (d) d.returns += 1;
+    }
     return days;
-  }, [records, from, to]);
+  }, [records, returns, from, to]);
 
-  function exportRows(kind: "xlsx" | "pdf") {
-    const rows = records.map((r) => ({
+  function fmtDuration(sec: number): string {
+    if (!sec) return "—";
+    const m = Math.floor(sec / 60); const s = sec % 60;
+    return m ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  function currentRows(): Record<string, unknown>[] {
+    if (tab === "returns") {
+      return returns.map((r) => ({
+        created_at: r.created_at,
+        rma: r.rma,
+        order_number: r.order_number ?? "",
+        marketplace: r.marketplace ?? "",
+        courier: r.courier ?? "",
+        reason: r.reason ?? "",
+        status: r.status,
+        resolution: r.resolution ?? "",
+        inspector: r.inspector_name ?? "",
+      }));
+    }
+    if (tab === "marketplaces") return marketplaceAgg.map((m) => ({ ...m, returnRate: m.orders ? ((m.returns / m.orders) * 100).toFixed(2) + "%" : "0%" }));
+    if (tab === "couriers") return courierAgg.map((c) => ({ ...c, returnRate: c.shipments ? ((c.returns / c.shipments) * 100).toFixed(2) + "%" : "0%" }));
+    if (tab === "productivity") return productivity.map((p) => ({ user: p.name, role: p.role, packed: p.packed, avg_packing_time_sec: p.avgSec }));
+    return records.map((r) => ({
       created_at: new Date(r.created_at).toISOString(),
       order_number: r.order_number ?? "",
       tracking_number: r.tracking_number ?? "",
@@ -142,10 +283,23 @@ function ReportsPage() {
       role: r.role ?? "",
       raw_code: r.raw_code,
     }));
+  }
+
+  function exportRows(kind: "xlsx" | "pdf" | "csv") {
+    const rows = currentRows();
     const stamp = new Date().toISOString().slice(0, 10);
-    if (kind === "xlsx") exportXlsx(rows, `flowops-report-${stamp}.xlsx`, "Packing");
-    else exportPdf(rows, `flowops-report-${stamp}.pdf`, "FlowOps Packing Report");
+    const base = `flowops-${tab}-${stamp}`;
+    if (kind === "xlsx") exportXlsx(rows, `${base}.xlsx`, tab);
+    else if (kind === "csv") exportCsv(rows, `${base}.csv`);
+    else exportPdf(rows, `${base}.pdf`, `FlowOps ${tab[0].toUpperCase() + tab.slice(1)} Report`);
     log({ data: { action: "report.exported", target_type: "report", metadata: { format: kind, rows: rows.length } } }).catch(() => undefined);
+    notify({
+      type: "export.completed",
+      title: `Report exported (${kind.toUpperCase()})`,
+      body: `${rows.length} rows`,
+      severity: "success",
+      link: "/reports",
+    });
   }
 
   return (
@@ -155,6 +309,7 @@ function ReportsPage() {
         description={t("reports.description")}
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={() => exportRows("csv")}><FileDown className="h-4 w-4" /> CSV</Button>
             <Button variant="outline" size="sm" onClick={() => exportRows("pdf")}><FileText className="h-4 w-4" /> PDF</Button>
             <Button size="sm" onClick={() => exportRows("xlsx")}><FileSpreadsheet className="h-4 w-4" /> Excel</Button>
           </>
@@ -162,9 +317,22 @@ function ReportsPage() {
       />
 
       <div className="rounded-lg border bg-card p-4 shadow-card">
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <div className="space-y-1.5"><Label>From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label>To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-7">
+          <div className="space-y-1.5">
+            <Label>Range</Label>
+            <Select value={preset} onValueChange={(v) => applyPreset(v as Preset)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+                <SelectItem value="month">This month</SelectItem>
+                <SelectItem value="custom">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5"><Label>From</Label><Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} /></div>
+          <div className="space-y-1.5"><Label>To</Label><Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} /></div>
           <div className="space-y-1.5">
             <Label>Marketplace</Label>
             <Select value={marketplace} onValueChange={setMarketplace}>
@@ -206,19 +374,103 @@ function ReportsPage() {
             </Select>
           </div>
         </div>
-        <div className="mt-3 text-xs text-muted-foreground"><Download className="inline h-3 w-3 mr-1" /> {records.length} records match.</div>
+        <div className="mt-3 text-xs text-muted-foreground"><Download className="inline h-3 w-3 mr-1" /> {records.length} packing records · {returns.length} returns in range.</div>
       </div>
 
-      <Tabs defaultValue="marketplaces" className="space-y-4">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList>
+          <TabsTrigger value="packing">Packing</TabsTrigger>
+          <TabsTrigger value="returns">Returns</TabsTrigger>
           <TabsTrigger value="marketplaces">{t("reports.tabs.marketplaces")}</TabsTrigger>
           <TabsTrigger value="couriers">{t("reports.tabs.couriers")}</TabsTrigger>
           <TabsTrigger value="productivity">{t("reports.tabs.productivity")}</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="packing" className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-5">
+            <KpiCard label="Total orders" value={packingKpis.total} />
+            <KpiCard label="Packed" value={packingKpis.packed} />
+            <KpiCard label="Pending" value={packingKpis.pending} />
+            <KpiCard label="Failed packing" value={packingKpis.failed} />
+            <KpiCard label="Avg packing time" value={fmtDuration(packingKpis.avgSec)} />
+          </div>
+          <div className="rounded-lg border bg-card p-5 shadow-card">
+            <h3 className="text-sm font-semibold">Packing trend</h3>
+            <div className="mt-4 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={chartTooltip} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Line type="monotone" dataKey="packed" stroke="var(--chart-1)" strokeWidth={2.5} dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="returns" stroke="var(--chart-3)" strokeWidth={2.5} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="returns" className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+            <KpiCard label="Total returns" value={returnKpis.total} />
+            <KpiCard label="Return rate" value={`${returnKpis.rate.toFixed(2)}%`} />
+            <KpiCard label="Restocked" value={returnKpis.restocked} />
+            <KpiCard label="Damaged" value={returnKpis.damaged} />
+            <KpiCard label="Courier claims" value={returnKpis.courierClaim} />
+            <KpiCard label="Supplier claims" value={returnKpis.supplierClaim} />
+          </div>
+          <div className="rounded-lg border bg-card p-5 shadow-card">
+            <h3 className="text-sm font-semibold">Return reasons</h3>
+            <div className="mt-4 h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={returnKpis.reasons.slice(0, 10)} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis type="number" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} width={140} />
+                  <Tooltip contentStyle={chartTooltip} />
+                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                    {returnKpis.reasons.slice(0, 10).map((_, i) => <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-card shadow-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>RMA</TableHead>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Marketplace</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Resolution</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {returns.slice(0, 50).map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-medium">{r.rma}</TableCell>
+                    <TableCell>{r.order_number ?? "—"}</TableCell>
+                    <TableCell>{r.marketplace ?? "—"}</TableCell>
+                    <TableCell>{r.reason ?? "—"}</TableCell>
+                    <TableCell><Badge variant="secondary">{r.status}</Badge></TableCell>
+                    <TableCell className="text-muted-foreground">{r.resolution ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+                {!returns.length && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No returns in range.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+
         <TabsContent value="marketplaces" className="space-y-4">
           <div className="rounded-lg border bg-card p-5 shadow-card">
-            <h3 className="text-sm font-semibold">Orders by marketplace</h3>
+            <h3 className="text-sm font-semibold">Marketplace performance</h3>
             <div className="mt-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={marketplaceAgg}>
@@ -229,6 +481,7 @@ function ReportsPage() {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   <Bar dataKey="orders" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="packed" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="returns" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -240,7 +493,8 @@ function ReportsPage() {
                   <TableHead>Marketplace</TableHead>
                   <TableHead className="text-right">Orders</TableHead>
                   <TableHead className="text-right">Packed</TableHead>
-                  <TableHead className="text-right">Completion %</TableHead>
+                  <TableHead className="text-right">Returns</TableHead>
+                  <TableHead className="text-right">Return rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -249,7 +503,8 @@ function ReportsPage() {
                     <TableCell className="font-medium">{m.name}</TableCell>
                     <TableCell className="text-right">{m.orders.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{m.packed}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{m.orders ? ((m.packed / m.orders) * 100).toFixed(1) : "0.0"}%</TableCell>
+                    <TableCell className="text-right">{m.returns}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{m.orders ? ((m.returns / m.orders) * 100).toFixed(2) : "0.00"}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -259,7 +514,7 @@ function ReportsPage() {
 
         <TabsContent value="couriers" className="space-y-4">
           <div className="rounded-lg border bg-card p-5 shadow-card">
-            <h3 className="text-sm font-semibold">Shipments by courier</h3>
+            <h3 className="text-sm font-semibold">Courier performance</h3>
             <div className="mt-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={courierAgg} layout="vertical">
@@ -281,8 +536,11 @@ function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Courier</TableHead>
-                  <TableHead className="text-right">Shipments</TableHead>
+                  <TableHead className="text-right">Volume</TableHead>
                   <TableHead className="text-right">Shipped</TableHead>
+                  <TableHead className="text-right">Failed</TableHead>
+                  <TableHead className="text-right">Returns</TableHead>
+                  <TableHead className="text-right">Return rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -291,6 +549,9 @@ function ReportsPage() {
                     <TableCell className="font-medium">{c.name}</TableCell>
                     <TableCell className="text-right">{c.shipments.toLocaleString()}</TableCell>
                     <TableCell className="text-right">{c.shipped}</TableCell>
+                    <TableCell className="text-right">{c.failed}</TableCell>
+                    <TableCell className="text-right">{c.returns}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{c.shipments ? ((c.returns / c.shipments) * 100).toFixed(2) : "0.00"}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -299,6 +560,11 @@ function ReportsPage() {
         </TabsContent>
 
         <TabsContent value="productivity" className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-3">
+            <KpiCard label="Total packed (range)" value={packingKpis.packed} />
+            <KpiCard label="Avg packing time" value={fmtDuration(packingKpis.avgSec)} />
+            <KpiCard label="Returns processed" value={returnKpis.total} />
+          </div>
           <div className="rounded-lg border bg-card p-5 shadow-card">
             <h3 className="text-sm font-semibold">Daily packing trend</h3>
             <div className="mt-4 h-64">
@@ -314,32 +580,72 @@ function ReportsPage() {
             </div>
           </div>
           <div className="rounded-lg border bg-card shadow-card">
+            <div className="px-4 py-3 border-b text-sm font-semibold">Top packers</div>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">#</TableHead>
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead className="text-right">Items packed</TableHead>
+                  <TableHead className="text-right">Avg time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {productivity.map((u) => (
-                  <TableRow key={u.name}>
+                {productivity.map((u, i) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                     <TableCell className="font-medium">{u.name}</TableCell>
                     <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
                     <TableCell className="text-right">{u.packed}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{fmtDuration(u.avgSec)}</TableCell>
                   </TableRow>
                 ))}
                 {!productivity.length && (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center text-sm text-muted-foreground py-8">No data for current filters.</TableCell>
+                    <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">No data for current filters.</TableCell>
                   </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="rounded-lg border bg-card shadow-card">
+            <div className="px-4 py-3 border-b text-sm font-semibold">Top return staff</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">#</TableHead>
+                  <TableHead>User</TableHead>
+                  <TableHead className="text-right">Processed</TableHead>
+                  <TableHead className="text-right">Completed</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {returnStaffProductivity.map((u, i) => (
+                  <TableRow key={u.name + i}>
+                    <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="text-right">{u.processed}</TableCell>
+                    <TableCell className="text-right">{u.completed}</TableCell>
+                  </TableRow>
+                ))}
+                {!returnStaffProductivity.length && (
+                  <TableRow><TableCell colSpan={4} className="text-center text-sm text-muted-foreground py-8">No return activity in range.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-card">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-2xl font-semibold">{value}</div>
     </div>
   );
 }

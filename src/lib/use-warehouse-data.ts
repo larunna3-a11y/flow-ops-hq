@@ -24,15 +24,62 @@ export type ReturnRecord = {
   id: string;
   workspace_id: string;
   rma: string;
+  return_number: string | null;
+  order_id: string | null;
+  tracking_number: string | null;
+  courier: string | null;
+  customer_name: string | null;
+  packing_record_id: string | null;
+  packer_name: string | null;
+  packing_date: string | null;
+  condition: string | null;
+  inspection_notes: string | null;
+  inspection_photos: { path: string; url?: string }[];
+  inspection_date: string | null;
+  inspector_id: string | null;
+  inspector_name: string | null;
+  resolution: string | null;
+  completed_at: string | null;
   order_number: string | null;
   marketplace: string | null;
   reason: string | null;
-  status: "received" | "inspecting" | "restocked" | "rejected";
+  status: string;
   assigned_to: string | null;
   assigned_to_name: string | null;
   received_at: string;
   created_at: string;
   updated_at: string;
+};
+
+export type ReturnItem = {
+  id: string;
+  workspace_id: string;
+  return_id: string;
+  order_item_id: string | null;
+  sku: string | null;
+  product_name: string | null;
+  product_variant: string | null;
+  original_quantity: number;
+  returned_quantity: number;
+  missing_quantity: number;
+  damaged_quantity: number;
+  wrong_quantity: number;
+  inventory_action: "none" | "restock" | "damaged" | "quarantine";
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReturnTimelineEntry = {
+  id: string;
+  workspace_id: string;
+  return_id: string;
+  event: string;
+  message: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 };
 
 export type AuditLog = {
@@ -135,13 +182,27 @@ export function useWorkspaceMembers() {
     queryFn: async () => {
       const { data: m, error } = await supabase
         .from("users")
-        .select("user_id")
+        .select("user_id, status")
         .eq("workspace_id", workspaceId!);
+
       if (error) throw error;
       const ids = (m ?? []).map((r) => r.user_id);
       if (!ids.length) return [];
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
-      return (profs ?? []).map((p) => ({ id: p.id, name: p.full_name || p.email }));
+      const [{ data: profs }, { data: roles }] = await Promise.all([
+        supabase.from("profiles").select("id, full_name, email, last_login").in("id", ids),
+        supabase.from("roles").select("user_id, role").in("user_id", ids).eq("workspace_id", workspaceId!),
+      ]);
+      const roleMap = new Map((roles ?? []).map((r) => [r.user_id, r.role as string]));
+      const statusMap = new Map((m ?? []).map((u) => [u.user_id, u.status as string]));
+      return (profs ?? []).map((p) => ({
+        id: p.id,
+        name: p.full_name || p.email,
+        email: p.email,
+        last_login: (p as { last_login?: string | null }).last_login ?? null,
+        role: roleMap.get(p.id) ?? null,
+        status: statusMap.get(p.id) ?? "active",
+      }));
     },
   });
 }
+

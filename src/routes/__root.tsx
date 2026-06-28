@@ -92,8 +92,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "FlowOps — Warehouse Operations Platform" },
       { name: "twitter:description", content: "FlowOps is a modern warehouse operations platform for e-commerce brands, marketplace sellers and warehouse teams." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/552069a9-25d7-47a7-903b-8ac78808577c" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/552069a9-25d7-47a7-903b-8ac78808577c" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/a0e66938-1bdc-46d6-bc65-71f48b40b462" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/a0e66938-1bdc-46d6-bc65-71f48b40b462" },
     ],
     links: [
       {

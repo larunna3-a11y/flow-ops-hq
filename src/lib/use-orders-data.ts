@@ -31,14 +31,29 @@ export type Order = {
   marketplace: string | null;
   store_name: string | null;
   customer_name: string | null;
+  customer_phone: string | null;
   tracking_number: string | null;
   courier: string | null;
   order_status: string;
-  packing_status: "waiting" | "assigned" | "packing" | "packed" | "shipped";
+  packing_status: string;
+  shipping_status: string;
   assigned_to: string | null;
   assigned_to_name: string | null;
   assigned_at: string | null;
   ordered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OrderItem = {
+  id: string;
+  workspace_id: string;
+  order_id: string;
+  sku: string;
+  product_name: string;
+  product_variant: string | null;
+  quantity: number;
+  warehouse_location: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -99,13 +114,46 @@ export function useOrders(filters?: {
       if (filters?.status && filters.status !== "all") q = q.eq("packing_status", filters.status);
       if (filters?.search) {
         const s = filters.search.replace(/[%,]/g, "");
-        q = q.or(
-          `order_number.ilike.%${s}%,tracking_number.ilike.%${s}%,customer_name.ilike.%${s}%`,
+        // Find order_ids whose items match the SKU search term, then OR with header columns.
+        const { data: skuMatches } = await db
+          .from("order_items")
+          .select("order_id")
+          .eq("workspace_id", wid)
+          .ilike("sku", `%${s}%`)
+          .limit(500);
+        const skuOrderIds = Array.from(
+          new Set((skuMatches ?? []).map((r: { order_id: string }) => r.order_id)),
         );
+        const orParts = [
+          `order_number.ilike.%${s}%`,
+          `tracking_number.ilike.%${s}%`,
+          `customer_name.ilike.%${s}%`,
+        ];
+        if (skuOrderIds.length) orParts.push(`id.in.(${skuOrderIds.join(",")})`);
+        q = q.or(orParts.join(","));
       }
       const { data, error } = await q;
       if (error) throw error;
       return (data ?? []) as Order[];
+    },
+  });
+}
+
+export function useOrderItems(orderId: string | null | undefined) {
+  const ws = useWorkspace();
+  const wid = ws.data?.workspace?.id;
+  return useQuery({
+    queryKey: ["order_items", wid, orderId],
+    enabled: !!wid && !!orderId,
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("order_items")
+        .select("*")
+        .eq("workspace_id", wid)
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as OrderItem[];
     },
   });
 }
@@ -140,4 +188,21 @@ export const COURIERS = [
   "GoTo Logistics",
   "Lazada Express",
 ] as const;
-export const PACKING_STATUSES = ["waiting", "assigned", "packing", "packed", "shipped"] as const;
+export const PACKING_STATUSES = [
+  "new",
+  "ready",
+  "packing",
+  "packed",
+  "shipped",
+  "delivered",
+  "returned",
+  "cancelled",
+] as const;
+
+// Backward-compatible aliases for legacy values stored in DB rows.
+export const PACKING_STATUS_ALIASES: Record<string, string> = {
+  waiting: "new",
+  assigned: "ready",
+};
+
+export const ORDER_STATUSES = PACKING_STATUSES;

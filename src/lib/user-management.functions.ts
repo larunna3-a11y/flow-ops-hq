@@ -4,7 +4,10 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
-async function assertOwner(supabase: import("@supabase/supabase-js").SupabaseClient<Database>, userId: string) {
+async function assertOwner(
+  supabase: import("@supabase/supabase-js").SupabaseClient<Database>,
+  userId: string,
+) {
   const { data: u } = await supabase
     .from("users")
     .select("workspace_id")
@@ -21,125 +24,127 @@ async function assertOwner(supabase: import("@supabase/supabase-js").SupabaseCli
   return u.workspace_id;
 }
 
-export const inviteUser = createServerFn({ method: "POST" })
+/**
+ * Phone-first invitation: creates a pending invitation row carrying full name,
+ * phone, role and (optional) account expiration. Returns the invitation token
+ * so the Owner can copy the link or share it via WhatsApp.
+ */
+export const createPhoneInvitation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { email: string; role: AppRole; redirectTo: string }) => data)
+  .inputValidator(
+    (data: {
+      fullName: string;
+      phone: string;
+      role: AppRole;
+      // Number of days the invitee's account stays active after acceptance.
+      // `null` means permanent.
+      accountExpiresInDays: number | null;
+      // Number of days the invitation link itself stays valid before expiring.
+      invitationValidDays?: number;
+    }) => data,
+  )
   .handler(async ({ data, context }) => {
     const { userId, supabase } = context;
     const workspaceId = await assertOwner(supabase, userId);
-    const email = data.email.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Invalid email address");
+
+    const fullName = data.fullName.trim();
+    const phone = data.phone.replace(/[^0-9+]/g, "");
+    if (!fullName) throw new Error("Full name is required");
+    if (!phone || phone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
+    if (!["Packer", "Return Staff", "Supervisor"].includes(data.role))
+      throw new Error("Invalid role");
+
+    const linkValidDays = data.invitationValidDays ?? 14;
+    const inviteExpires = new Date(
+      Date.now() + linkValidDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const accountExpires =
+      data.accountExpiresInDays == null
+        ? null
+        : new Date(Date.now() + data.accountExpiresInDays * 24 * 60 * 60 * 1000).toISOString();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Membership check
-    const { data: existingProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-    if (existingProfile) {
-      const { data: existingMember } = await supabaseAdmin
-        .from("users")
-        .select("user_id, workspace_id")
-        .eq("user_id", existingProfile.id)
-        .maybeSingle();
-      if (existingMember) throw new Error("This user already belongs to a workspace.");
-    }
-
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    // Upsert invitation row so handle_new_user picks it up on signup.
-    const { data: existingInv } = await supabaseAdmin
+    // Prevent duplicate pending invitations to the same phone.
+    const { data: existing } = await supabaseAdmin
       .from("invitations")
       .select("id")
       .eq("workspace_id", workspaceId)
-      .eq("email", email)
-      .in("status", ["pending"])
+      .eq("phone", phone)
+      .eq("status", "pending")
       .maybeSingle();
+    if (existing) throw new Error("There is already a pending invitation for this phone number.");
 
-    let invitationId = existingInv?.id ?? null;
-    if (invitationId) {
-      await supabaseAdmin
-        .from("invitations")
-        .update({ role: data.role, expires_at: expires, status: "pending", invited_by: userId })
-        .eq("id", invitationId);
-    } else {
-      const { data: inv, error: invErr } = await supabaseAdmin
-        .from("invitations")
-        .insert({
-          workspace_id: workspaceId,
-          email,
-          role: data.role,
-          invited_by: userId,
-          expires_at: expires,
-          status: "pending",
-        })
-        .select("id")
-        .single();
-      if (invErr) throw invErr;
-      invitationId = inv.id;
-    }
-
-    // Send the Supabase invitation email.
-    const { error: mailErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: data.redirectTo,
-      data: { workspace_id: workspaceId, role: data.role },
-    });
-    if (mailErr && !/already.*registered|exist/i.test(mailErr.message)) {
-      // If user already exists in auth, fall back to a recovery email so they can set a new password.
-      const { error: recErr } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: data.redirectTo,
-      });
-      if (recErr) throw mailErr;
-    }
+    const { data: inv, error } = await supabaseAdmin
+      .from("invitations")
+      .insert({
+        workspace_id: workspaceId,
+        email: null,
+        full_name: fullName,
+        phone,
+        role: data.role,
+        invited_by: userId,
+        expires_at: inviteExpires,
+        status: "pending",
+        account_expires_at: accountExpires,
+      } as never)
+      .select("id, token, expires_at, account_expires_at, full_name, phone, role")
+      .single();
+    if (error) throw error;
 
     await supabaseAdmin.from("audit_logs").insert({
       workspace_id: workspaceId,
       actor_id: userId,
-      action: "invitation.sent",
+      action: "invitation.created",
       target_type: "invitation",
-      target_id: invitationId,
-      metadata: { email, role: data.role } as never,
+      target_id: inv.id,
+      metadata: { full_name: fullName, phone, role: data.role } as never,
     });
 
-    return { id: invitationId };
+    return inv;
   });
 
-export const resendInvitation = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: { invitationId: string; redirectTo: string }) => data)
-  .handler(async ({ data, context }) => {
-    const { userId, supabase } = context;
-    const workspaceId = await assertOwner(supabase, userId);
+/** Public lookup of a pending invitation by its secret token (used by /accept-invite). */
+export const getInvitationByToken = createServerFn({ method: "GET" })
+  .inputValidator((data: { token: string }) => data)
+  .handler(async ({ data }) => {
+    if (!data.token || data.token.length < 16) return null;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: inv } = await supabaseAdmin
       .from("invitations")
-      .select("id, email, workspace_id")
-      .eq("id", data.invitationId)
+      .select("id, full_name, phone, role, status, expires_at, account_expires_at, workspace_id")
+      .eq("token", data.token)
       .maybeSingle();
-    if (!inv || inv.workspace_id !== workspaceId) throw new Error("Invitation not found");
+    if (!inv) return null;
+    const { data: ws } = await supabaseAdmin
+      .from("workspaces")
+      .select("name")
+      .eq("id", inv.workspace_id)
+      .maybeSingle();
+    return {
+      id: inv.id,
+      full_name: inv.full_name,
+      phone: inv.phone,
+      role: inv.role,
+      status: inv.status,
+      expires_at: inv.expires_at,
+      account_expires_at: inv.account_expires_at,
+      workspace_name: ws?.name ?? "FlowOps Workspace",
+    };
+  });
 
-    const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    await supabaseAdmin
+export const revokeInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { invitationId: string }) => data)
+  .handler(async ({ data, context }) => {
+    const workspaceId = await assertOwner(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
       .from("invitations")
-      .update({ status: "pending", expires_at: expires })
-      .eq("id", inv.id);
-
-    const { error: mailErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(inv.email, {
-      redirectTo: data.redirectTo,
-    });
-    if (mailErr) {
-      await supabaseAdmin.auth.resetPasswordForEmail(inv.email, { redirectTo: data.redirectTo });
-    }
-
-    await supabaseAdmin.from("audit_logs").insert({
-      workspace_id: workspaceId,
-      actor_id: userId,
-      action: "invitation.resent",
-      target_type: "invitation",
-      target_id: inv.id,
-    });
+      .update({ status: "revoked" })
+      .eq("id", data.invitationId)
+      .eq("workspace_id", workspaceId);
+    if (error) throw error;
     return { ok: true };
   });
 
@@ -152,7 +157,6 @@ export const removeUser = createServerFn({ method: "POST" })
     if (data.userId === userId) throw new Error("You cannot remove yourself.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Don't allow removing other Owners (defensive — workspace should have a single owner).
     const { data: targetRole } = await supabaseAdmin
       .from("roles")
       .select("role")
@@ -161,8 +165,16 @@ export const removeUser = createServerFn({ method: "POST" })
       .maybeSingle();
     if (targetRole?.role === "Owner") throw new Error("Cannot remove the workspace Owner.");
 
-    await supabaseAdmin.from("roles").delete().eq("workspace_id", workspaceId).eq("user_id", data.userId);
-    await supabaseAdmin.from("users").delete().eq("workspace_id", workspaceId).eq("user_id", data.userId);
+    await supabaseAdmin
+      .from("roles")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", data.userId);
+    await supabaseAdmin
+      .from("users")
+      .delete()
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", data.userId);
 
     await supabaseAdmin.from("audit_logs").insert({
       workspace_id: workspaceId,

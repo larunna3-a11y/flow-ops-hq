@@ -457,6 +457,13 @@
       "packedToday": "Order dipacking hari ini",
       "connectedStores": "Toko terhubung",
       "lastImport": "Impor terakhir"
+    },
+    "orders": {
+      "total": "Total order",
+      "ready": "Siap packing",
+      "packing": "Packing",
+      "packed": "Selesai packing",
+      "shipped": "Dikirim"
     }
   },
   "packing": {
@@ -753,11 +760,24 @@
       "created": "Dibuat"
     },
     "status": {
-      "waiting": "Menunggu",
-      "assigned": "Ditugaskan",
+      "new": "Order Baru",
+      "ready": "Siap Packing",
       "packing": "Packing",
-      "packed": "Selesai packing",
-      "shipped": "Dikirim"
+      "packed": "Selesai Packing",
+      "shipped": "Dikirim",
+      "delivered": "Terkirim",
+      "returned": "Dikembalikan",
+      "cancelled": "Dibatalkan",
+      "waiting": "Order Baru",
+      "assigned": "Siap Packing"
+    },
+    "items": {
+      "title": "Item order",
+      "sku": "SKU",
+      "product": "Produk",
+      "variant": "Varian",
+      "qty": "Qty",
+      "empty": "Belum ada item untuk order ini."
     },
     "assign": {
       "label": "Tugaskan ke packer",

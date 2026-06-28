@@ -36,9 +36,9 @@ export function StatusPill({
 
 export function statusToTone(status: string): Tone {
   const s = status.toLowerCase();
-  if (["packed", "shipped", "restocked", "matched", "active"].includes(s)) return "success";
-  if (["queued", "received", "invited"].includes(s)) return "info";
-  if (["in_progress", "inspecting"].includes(s)) return "warning";
-  if (["mismatch", "rejected", "disabled", "unknown"].includes(s)) return "danger";
+  if (["packed", "shipped", "delivered", "restocked", "matched", "active"].includes(s)) return "success";
+  if (["queued", "received", "invited", "new", "waiting"].includes(s)) return "info";
+  if (["ready", "assigned", "packing", "in_progress", "inspecting"].includes(s)) return "warning";
+  if (["mismatch", "rejected", "disabled", "unknown", "returned", "cancelled"].includes(s)) return "danger";
   return "muted";
 }

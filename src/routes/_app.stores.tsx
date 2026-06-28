@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Plug, RefreshCw, Plus, Store as StoreIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -29,7 +28,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
 import { useStores, MARKETPLACES } from "@/lib/use-orders-data";
-import { seedSprint2 } from "@/lib/sprint2-seed.functions";
 
 export const Route = createFileRoute("/_app/stores")({
   head: () => ({ meta: [{ title: "Connected Stores — FlowOps" }] }),
@@ -46,20 +44,11 @@ function StoresPage() {
   const stores = useStores();
   const isManager = ws.data?.role === "Owner" || ws.data?.role === "Supervisor";
   const wid = ws.data?.workspace?.id;
-  const seed = useServerFn(seedSprint2);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [marketplace, setMarketplace] = useState<string>("Shopee");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (ws.data?.role === "Owner" && stores.isSuccess && stores.data.length === 0) {
-      seed()
-        .then(() => qc.invalidateQueries({ queryKey: ["stores"] }))
-        .catch(() => undefined);
-    }
-  }, [ws.data?.role, stores.isSuccess, stores.data?.length, seed, qc]);
 
   const addStore = async () => {
     if (!wid || !name.trim()) return;
