@@ -55,112 +55,17 @@ export type Database = {
           },
         ]
       }
-      import_logs: {
-        Row: {
-          created_at: string
-          id: string
-          import_id: string
-          message: string | null
-          order_number: string | null
-          row_number: number | null
-          status: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          import_id: string
-          message?: string | null
-          order_number?: string | null
-          row_number?: number | null
-          status: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          import_id?: string
-          message?: string | null
-          order_number?: string | null
-          row_number?: number | null
-          status?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "import_logs_import_id_fkey"
-            columns: ["import_id"]
-            isOneToOne: false
-            referencedRelation: "imports"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "import_logs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      imports: {
-        Row: {
-          created_at: string
-          duplicate_count: number
-          failed_count: number
-          filename: string | null
-          id: string
-          imported_by: string | null
-          imported_by_name: string | null
-          status: string
-          success_count: number
-          total_rows: number
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          duplicate_count?: number
-          failed_count?: number
-          filename?: string | null
-          id?: string
-          imported_by?: string | null
-          imported_by_name?: string | null
-          status?: string
-          success_count?: number
-          total_rows?: number
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          duplicate_count?: number
-          failed_count?: number
-          filename?: string | null
-          id?: string
-          imported_by?: string | null
-          imported_by_name?: string | null
-          status?: string
-          success_count?: number
-          total_rows?: number
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "imports_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invitations: {
         Row: {
           accepted_at: string | null
+          account_expires_at: string | null
           created_at: string
-          email: string
+          email: string | null
           expires_at: string
+          full_name: string | null
           id: string
           invited_by: string | null
+          phone: string | null
           role: Database["public"]["Enums"]["app_role"]
           status: Database["public"]["Enums"]["invitation_status"]
           token: string
@@ -168,11 +73,14 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          account_expires_at?: string | null
           created_at?: string
-          email: string
+          email?: string | null
           expires_at?: string
+          full_name?: string | null
           id?: string
           invited_by?: string | null
+          phone?: string | null
           role: Database["public"]["Enums"]["app_role"]
           status?: Database["public"]["Enums"]["invitation_status"]
           token?: string
@@ -180,11 +88,14 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          account_expires_at?: string | null
           created_at?: string
-          email?: string
+          email?: string | null
           expires_at?: string
+          full_name?: string | null
           id?: string
           invited_by?: string | null
+          phone?: string | null
           role?: Database["public"]["Enums"]["app_role"]
           status?: Database["public"]["Enums"]["invitation_status"]
           token?: string
@@ -193,197 +104,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "invitations_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_assignments: {
-        Row: {
-          assigned_at: string
-          assigned_by: string | null
-          assigned_by_name: string | null
-          created_at: string
-          id: string
-          order_id: string
-          packer_id: string
-          packer_name: string
-          status: string
-          workspace_id: string
-        }
-        Insert: {
-          assigned_at?: string
-          assigned_by?: string | null
-          assigned_by_name?: string | null
-          created_at?: string
-          id?: string
-          order_id: string
-          packer_id: string
-          packer_name: string
-          status?: string
-          workspace_id: string
-        }
-        Update: {
-          assigned_at?: string
-          assigned_by?: string | null
-          assigned_by_name?: string | null
-          created_at?: string
-          id?: string
-          order_id?: string
-          packer_id?: string
-          packer_name?: string
-          status?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_assignments_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      orders: {
-        Row: {
-          assigned_at: string | null
-          assigned_to: string | null
-          assigned_to_name: string | null
-          courier: string | null
-          created_at: string
-          customer_name: string | null
-          id: string
-          marketplace: string | null
-          order_number: string
-          order_status: string
-          ordered_at: string | null
-          packing_status: string
-          store_id: string | null
-          store_name: string | null
-          tracking_number: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          assigned_at?: string | null
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          courier?: string | null
-          created_at?: string
-          customer_name?: string | null
-          id?: string
-          marketplace?: string | null
-          order_number: string
-          order_status?: string
-          ordered_at?: string | null
-          packing_status?: string
-          store_id?: string | null
-          store_name?: string | null
-          tracking_number?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          assigned_at?: string | null
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          courier?: string | null
-          created_at?: string
-          customer_name?: string | null
-          id?: string
-          marketplace?: string | null
-          order_number?: string
-          order_status?: string
-          ordered_at?: string | null
-          packing_status?: string
-          store_id?: string | null
-          store_name?: string | null
-          tracking_number?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_store_id_fkey"
-            columns: ["store_id"]
-            isOneToOne: false
-            referencedRelation: "stores"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      packing_records: {
-        Row: {
-          courier: string | null
-          created_at: string
-          id: string
-          marketplace: string | null
-          order_number: string | null
-          packing_timestamp: string | null
-          raw_code: string
-          role: string | null
-          scan_timestamp: string
-          status: string
-          tracking_number: string | null
-          updated_at: string
-          user_id: string
-          user_name: string
-          workspace_id: string
-        }
-        Insert: {
-          courier?: string | null
-          created_at?: string
-          id?: string
-          marketplace?: string | null
-          order_number?: string | null
-          packing_timestamp?: string | null
-          raw_code: string
-          role?: string | null
-          scan_timestamp?: string
-          status?: string
-          tracking_number?: string | null
-          updated_at?: string
-          user_id: string
-          user_name: string
-          workspace_id: string
-        }
-        Update: {
-          courier?: string | null
-          created_at?: string
-          id?: string
-          marketplace?: string | null
-          order_number?: string | null
-          packing_timestamp?: string | null
-          raw_code?: string
-          role?: string | null
-          scan_timestamp?: string
-          status?: string
-          tracking_number?: string | null
-          updated_at?: string
-          user_id?: string
-          user_name?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "packing_records_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -418,59 +138,6 @@ export type Database = {
         }
         Relationships: []
       }
-      returns: {
-        Row: {
-          assigned_to: string | null
-          assigned_to_name: string | null
-          created_at: string
-          id: string
-          marketplace: string | null
-          order_number: string | null
-          reason: string | null
-          received_at: string
-          rma: string
-          status: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          created_at?: string
-          id?: string
-          marketplace?: string | null
-          order_number?: string | null
-          reason?: string | null
-          received_at?: string
-          rma: string
-          status?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          assigned_to?: string | null
-          assigned_to_name?: string | null
-          created_at?: string
-          id?: string
-          marketplace?: string | null
-          order_number?: string | null
-          reason?: string | null
-          received_at?: string
-          rma?: string
-          status?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "returns_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       roles: {
         Row: {
           created_at: string
@@ -503,80 +170,39 @@ export type Database = {
           },
         ]
       }
-      stores: {
-        Row: {
-          connection_status: string
-          created_at: string
-          created_by: string | null
-          id: string
-          last_sync_at: string | null
-          logo_url: string | null
-          marketplace: string
-          name: string
-          store_status: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          connection_status?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_sync_at?: string | null
-          logo_url?: string | null
-          marketplace: string
-          name: string
-          store_status?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          connection_status?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          last_sync_at?: string | null
-          logo_url?: string | null
-          marketplace?: string
-          name?: string
-          store_status?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "stores_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
+          account_expires_at: string | null
+          full_name: string | null
           id: string
           invited_by: string | null
           joined_at: string
           last_active_at: string | null
+          phone: string | null
           status: Database["public"]["Enums"]["member_status"]
           user_id: string
           workspace_id: string
         }
         Insert: {
+          account_expires_at?: string | null
+          full_name?: string | null
           id?: string
           invited_by?: string | null
           joined_at?: string
           last_active_at?: string | null
+          phone?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id: string
           workspace_id: string
         }
         Update: {
+          account_expires_at?: string | null
+          full_name?: string | null
           id?: string
           invited_by?: string | null
           joined_at?: string
           last_active_at?: string | null
+          phone?: string | null
           status?: Database["public"]["Enums"]["member_status"]
           user_id?: string
           workspace_id?: string
@@ -601,6 +227,8 @@ export type Database = {
           logo_url: string | null
           name: string
           owner_id: string | null
+          plan: string
+          preferences: Json
           slug: string
           timezone: string
           updated_at: string
@@ -614,6 +242,8 @@ export type Database = {
           logo_url?: string | null
           name: string
           owner_id?: string | null
+          plan?: string
+          preferences?: Json
           slug: string
           timezone?: string
           updated_at?: string
@@ -627,6 +257,8 @@ export type Database = {
           logo_url?: string | null
           name?: string
           owner_id?: string | null
+          plan?: string
+          preferences?: Json
           slug?: string
           timezone?: string
           updated_at?: string
