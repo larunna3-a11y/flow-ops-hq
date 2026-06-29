@@ -34,13 +34,8 @@ import { StatCard } from "@/components/stat-card";
 import { StatusPill, statusToTone } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  usePackingRecords,
-  useReturns,
-  useAuditLogs,
-  useWorkspaceMembers,
-} from "@/lib/use-warehouse-data";
-import { useOrders, useStores, useImports } from "@/lib/use-orders-data";
+import { usePackingRecords, useReturns, useAuditLogs, useWorkspaceMembers } from "@/lib/use-warehouse-data";
+import { useDashboardStats, useImports } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -84,12 +79,14 @@ function DashboardPage() {
   const [customTo, setCustomTo] = useState("");
   const range = useMemo(() => rangeFor(preset, customFrom, customTo), [preset, customFrom, customTo]);
 
+  // Aggregate stats — no row limits, server-side COUNT queries
+  const dashboardStats = useDashboardStats(range);
+
+  // These are still used for charts only (not KPI cards)
   const records = usePackingRecords({ from: range.from, to: range.to });
   const recordsAll = usePackingRecords();
   const returns = useReturns();
   const activity = useAuditLogs(12);
-  const orders = useOrders();
-  const stores = useStores();
   const imports = useImports();
   const members = useWorkspaceMembers();
 
@@ -99,31 +96,69 @@ function DashboardPage() {
     if (!workspaceId) return;
     const channel = supabase
       .channel(`dashboard-${workspaceId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "packing_records", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["packing_records"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "returns", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["returns"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["orders"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "order_items", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["order_items"] });
-        qc.invalidateQueries({ queryKey: ["orders"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "imports", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["imports"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "audit_logs", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["audit_logs"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "users", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["workspace_members"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "roles", filter: `workspace_id=eq.${workspaceId}` }, () => {
-        qc.invalidateQueries({ queryKey: ["workspace_members"] });
-      })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "packing_records", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["packing_records"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "returns", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["returns"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "order_items", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["order_items"] });
+          qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "imports", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["imports"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "audit_logs", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["audit_logs"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "users", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["workspace_members"] });
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "roles", filter: `workspace_id=eq.${workspaceId}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["workspace_members"] });
+        },
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -132,36 +167,17 @@ function DashboardPage() {
 
   const data = records.data ?? [];
   const ret = returns.data ?? [];
-  const ord = orders.data ?? [];
   const mem = members.data ?? [];
 
-  const stats = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayIso = todayStart.toISOString();
-
-    const packed = data.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length;
-    const pending = data.filter((r) => r.status === "Pending").length;
-    const activePackers = new Set(data.map((r) => r.user_id)).size;
-
-    const ordersInRange = ord.filter((o) => o.created_at >= range.from && o.created_at <= range.to).length;
-    const returnsInRange = ret.filter((r) => r.created_at >= range.from && r.created_at <= range.to).length;
-
-    const activeUsers = new Set(
-      (activity.data ?? [])
-        .filter((a) => a.created_at >= todayIso && a.actor_id)
-        .map((a) => a.actor_id as string),
-    ).size;
-
-    return {
-      ordersInRange,
-      packed,
-      pending,
-      returnsInRange,
-      activePackers,
-      activeUsers,
-    };
-  }, [data, ret, ord, range, activity.data]);
+  const stats = dashboardStats.data ?? {
+    totalOrders: 0,
+    pendingOrders: 0,
+    packedOrders: 0,
+    shippedOrders: 0,
+    totalReturns: 0,
+    activePackers: 0,
+    activeUsers: 0,
+  };
 
   const roleSummary = useMemo(() => {
     const counts: Record<string, number> = { Owner: 0, Supervisor: 0, Packer: 0, "Return Staff": 0 };
@@ -175,7 +191,6 @@ function DashboardPage() {
       ReturnStaff: counts["Return Staff"],
     };
   }, [mem]);
-
 
   const marketplaceData = useMemo(() => {
     const m = new Map<string, number>();
@@ -256,54 +271,37 @@ function DashboardPage() {
             </div>
             {preset === "custom" && (
               <div className="flex items-center gap-1">
-                <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 w-36 text-xs" />
-                <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 w-36 text-xs" />
+                <Input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-8 w-36 text-xs"
+                />
+                <Input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-8 w-36 text-xs"
+                />
               </div>
             )}
-            <Button size="sm" asChild><Link to="/reports">{t("common.exportReport")}</Link></Button>
+            <Button size="sm" asChild>
+              <Link to="/reports">{t("common.exportReport")}</Link>
+            </Button>
           </>
         }
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
-        <StatCard label="Total orders" value={String(stats.ordersInRange)} icon={<ShoppingCart className="h-4 w-4" />} />
-        <StatCard label="Packed" value={String(stats.packed)} icon={<PackageCheck className="h-4 w-4" />} />
-        <StatCard label="Pending orders" value={String(stats.pending)} icon={<Truck className="h-4 w-4" />} />
-        <StatCard label="Total returns" value={String(stats.returnsInRange)} icon={<RotateCcw className="h-4 w-4" />} />
-        <StatCard label="Active packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
-        <StatCard label="Active users" value={String(stats.activeUsers)} icon={<UserCheck className="h-4 w-4" />} />
+      {/* Single KPI row — aggregate queries, no row limits */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-7">
+        <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={<ShoppingCart className="h-4 w-4" />} />
+        <StatCard label="Pending Orders" value={String(stats.pendingOrders)} icon={<Truck className="h-4 w-4" />} />
+        <StatCard label="Packed" value={String(stats.packedOrders)} icon={<PackageCheck className="h-4 w-4" />} />
+        <StatCard label="Shipped" value={String(stats.shippedOrders)} icon={<Truck className="h-4 w-4" />} />
+        <StatCard label="Total Returns" value={String(stats.totalReturns)} icon={<RotateCcw className="h-4 w-4" />} />
+        <StatCard label="Active Packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
+        <StatCard label="Active Users" value={String(stats.activeUsers)} icon={<UserCheck className="h-4 w-4" />} />
       </div>
-
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <StatCard
-          label={t("dashboard.orders.total")}
-          value={String(ord.length)}
-          icon={<ShoppingCart className="h-4 w-4" />}
-        />
-        <StatCard
-          label={t("dashboard.orders.ready")}
-          value={String(
-            ord.filter((o) => o.packing_status === "ready" || o.packing_status === "assigned").length,
-          )}
-          icon={<Users className="h-4 w-4" />}
-        />
-        <StatCard
-          label={t("dashboard.orders.packing")}
-          value={String(ord.filter((o) => o.packing_status === "packing").length)}
-          icon={<ScanLine className="h-4 w-4" />}
-        />
-        <StatCard
-          label={t("dashboard.orders.packed")}
-          value={String(ord.filter((o) => o.packing_status === "packed").length)}
-          icon={<PackageCheck className="h-4 w-4" />}
-        />
-        <StatCard
-          label={t("dashboard.orders.shipped")}
-          value={String(ord.filter((o) => o.packing_status === "shipped").length)}
-          icon={<Truck className="h-4 w-4" />}
-        />
-      </div>
-
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-lg border bg-card p-5 shadow-card">
@@ -328,7 +326,15 @@ function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--popover-foreground)" }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Area type="monotone" dataKey="packed" stroke="var(--chart-1)" strokeWidth={2} fill="url(#packed)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -341,8 +347,18 @@ function DashboardPage() {
           <div className="mt-2 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={marketplaceData} dataKey="orders" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={3} stroke="var(--card)">
-                  {marketplaceData.map((_, i) => <Cell key={i} fill={pieColors[i % pieColors.length]} />)}
+                <Pie
+                  data={marketplaceData}
+                  dataKey="orders"
+                  nameKey="name"
+                  innerRadius={50}
+                  outerRadius={80}
+                  paddingAngle={3}
+                  stroke="var(--card)"
+                >
+                  {marketplaceData.map((_, i) => (
+                    <Cell key={i} fill={pieColors[i % pieColors.length]} />
+                  ))}
                 </Pie>
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
               </PieChart>
@@ -358,9 +374,27 @@ function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={courierData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} interval={0} angle={-15} textAnchor="end" height={60} />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-15}
+                  textAnchor="end"
+                  height={60}
+                />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--popover-foreground)" }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Bar dataKey="shipments" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -371,12 +405,14 @@ function DashboardPage() {
           <div className="flex items-center justify-between border-b px-5 py-3">
             <h3 className="text-sm font-semibold">{t("dashboard.activity.title")}</h3>
             <Button asChild variant="ghost" size="sm">
-              <Link to="/users">{t("dashboard.activity.team")} <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+              <Link to="/users">
+                {t("dashboard.activity.team")} <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
             </Button>
           </div>
           <ul className="divide-y max-h-80 overflow-y-auto">
             {(activity.data ?? []).map((a) => {
-              const mod = (a.action.split(".")[0] ?? "system");
+              const mod = a.action.split(".")[0] ?? "system";
               return (
                 <li key={a.id} className="flex items-start gap-3 px-5 py-3">
                   <div className="mt-1 h-2 w-2 rounded-full bg-primary" />
@@ -387,7 +423,9 @@ function DashboardPage() {
                     </div>
                     <div className="text-xs text-muted-foreground capitalize">{mod}</div>
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(a.created_at).toLocaleTimeString()}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {new Date(a.created_at).toLocaleTimeString()}
+                  </span>
                 </li>
               );
             })}
@@ -406,9 +444,23 @@ function DashboardPage() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={returnStats}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
+                <XAxis
+                  dataKey="name"
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                />
                 <YAxis stroke="var(--muted-foreground)" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--popover-foreground)" }} />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Bar dataKey="value" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -423,8 +475,24 @@ function DashboardPage() {
               <BarChart data={userActivityData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis type="number" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} axisLine={false} width={110} />
-                <Tooltip contentStyle={{ background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--popover-foreground)" }} />
+                <YAxis
+                  dataKey="name"
+                  type="category"
+                  stroke="var(--muted-foreground)"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  width={110}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "var(--popover)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    color: "var(--popover-foreground)",
+                  }}
+                />
                 <Bar dataKey="actions" fill="var(--chart-4)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -435,12 +503,30 @@ function DashboardPage() {
           <h3 className="text-sm font-semibold">User summary</h3>
           <p className="text-xs text-muted-foreground">Workspace members</p>
           <dl className="mt-4 space-y-2 text-sm">
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Total users</dt><dd className="font-medium">{roleSummary.total}</dd></div>
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Active users</dt><dd className="font-medium">{roleSummary.active}</dd></div>
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Owners</dt><dd className="font-medium">{roleSummary.Owner}</dd></div>
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Supervisors</dt><dd className="font-medium">{roleSummary.Supervisor}</dd></div>
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Packers</dt><dd className="font-medium">{roleSummary.Packer}</dd></div>
-            <div className="flex items-center justify-between"><dt className="text-muted-foreground">Return staff</dt><dd className="font-medium">{roleSummary.ReturnStaff}</dd></div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Total users</dt>
+              <dd className="font-medium">{roleSummary.total}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Active users</dt>
+              <dd className="font-medium">{roleSummary.active}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Owners</dt>
+              <dd className="font-medium">{roleSummary.Owner}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Supervisors</dt>
+              <dd className="font-medium">{roleSummary.Supervisor}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Packers</dt>
+              <dd className="font-medium">{roleSummary.Packer}</dd>
+            </div>
+            <div className="flex items-center justify-between">
+              <dt className="text-muted-foreground">Return staff</dt>
+              <dd className="font-medium">{roleSummary.ReturnStaff}</dd>
+            </div>
           </dl>
         </div>
       </div>
@@ -452,15 +538,21 @@ function DashboardPage() {
             <p className="text-xs text-muted-foreground">Latest scans across stations</p>
           </div>
           <Button asChild variant="ghost" size="sm">
-            <Link to="/packing">Open queue <ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
+            <Link to="/packing">
+              Open queue <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
           </Button>
         </div>
         <div className="divide-y">
           {data.slice(0, 6).map((o) => (
             <div key={o.id} className="flex items-center gap-4 px-5 py-3 text-sm">
-              <div className="font-mono text-xs text-muted-foreground w-44 truncate">{o.order_number ?? o.raw_code}</div>
+              <div className="font-mono text-xs text-muted-foreground w-44 truncate">
+                {o.order_number ?? o.raw_code}
+              </div>
               <div className="flex-1 min-w-0">
-                <div className="truncate font-medium">{o.marketplace ?? "—"} · {o.courier ?? "—"}</div>
+                <div className="truncate font-medium">
+                  {o.marketplace ?? "—"} · {o.courier ?? "—"}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {o.user_name} · {new Date(o.created_at).toLocaleString()}
                 </div>
@@ -470,7 +562,11 @@ function DashboardPage() {
           ))}
           {!data.length && (
             <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-              No packing records in the selected range. Head to <Link to="/scanning" className="text-primary underline">Scan</Link> to create one.
+              No packing records in the selected range. Head to{" "}
+              <Link to="/scanning" className="text-primary underline">
+                Scan
+              </Link>{" "}
+              to create one.
             </div>
           )}
         </div>
