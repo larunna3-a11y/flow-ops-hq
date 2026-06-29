@@ -532,14 +532,108 @@ function UsersPage() {
       </div>
 
       <div className="rounded-lg border bg-card shadow-card">
-        <div className="flex items-center justify-between border-b p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
           <div className="flex items-center gap-2 text-sm">
             <Mail className="h-4 w-4 text-muted-foreground" />
             <span className="font-semibold">{t("users.invitations.title")}</span>
             <span className="text-muted-foreground">·</span>
             <Badge variant="outline">{pendingInvitations.length} {t("common.pending")}</Badge>
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingInvitations.length === 0}
+              onClick={async () => {
+                const text = pendingInvitations
+                  .map((i) => buildInviteLink(i.token))
+                  .join("\n");
+                try {
+                  await navigator.clipboard.writeText(text);
+                  toast.success(`Copied ${pendingInvitations.length} link${pendingInvitations.length === 1 ? "" : "s"}`);
+                } catch {
+                  toast.error("Could not copy links");
+                }
+              }}
+            >
+              <Files className="h-4 w-4" /> Copy All Links
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingInvitations.length === 0}
+              onClick={() => {
+                const rows = [
+                  ["phone", "role", "expires_at", "account_expires_at", "invitation_link"],
+                  ...pendingInvitations.map((i) => [
+                    i.phone ?? "",
+                    i.role,
+                    new Date(i.expires_at).toISOString(),
+                    i.account_expires_at ? new Date(i.account_expires_at).toISOString() : "permanent",
+                    buildInviteLink(i.token),
+                  ]),
+                ];
+                const csv = rows
+                  .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+                  .join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `flowops-invitations-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="h-4 w-4" /> Export Invitation List
+            </Button>
+          </div>
         </div>
+        {lastBatch.length > 0 && (
+          <div className="border-b bg-muted/30 p-4">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              Last batch created — {lastBatch.length} invitation{lastBatch.length === 1 ? "" : "s"}
+            </div>
+            <div className="space-y-1.5">
+              {lastBatch.map((b) => (
+                <div key={b.token} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-mono text-muted-foreground">{b.phone}</span>
+                  <code className="truncate rounded bg-background px-2 py-1 font-mono text-[11px]">
+                    {buildInviteLink(b.token)}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(buildInviteLink(b.token));
+                      toast.success("Link copied");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      const msg = buildWaMessage({
+                        workspaceName,
+                        fullName: "there",
+                        role: b.role,
+                        link: buildInviteLink(b.token),
+                        expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(),
+                      });
+                      window.open(buildWaUrl(b.phone, msg), "_blank", "noopener,noreferrer");
+                    }}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
