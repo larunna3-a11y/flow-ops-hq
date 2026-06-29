@@ -1,17 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Search, Sparkles, Activity, Users as UsersIcon, Package, RotateCcw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -20,34 +10,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatusPill, statusToTone } from "@/components/status-pill";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatCard } from "@/components/stat-card";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
-import {
-  usePackingRecords,
-  useReturns,
-  useWorkspaceMembers,
-  type AuditLog,
-} from "@/lib/use-warehouse-data";
+import { usePackingRecords, useReturns, useWorkspaceMembers, type AuditLog } from "@/lib/use-warehouse-data";
 
 const MARKETPLACES = ["Shopee", "TikTok Shop", "Tokopedia", "Lazada", "Blibli"];
 const COURIERS = [
-  "J&T Express", "SPX Express", "ID Express", "AnterAja", "SiCepat", "Ninja Xpress", "GoTo Logistics", "Lazada Express",
+  "J&T Express",
+  "SPX Express",
+  "ID Express",
+  "AnterAja",
+  "SiCepat",
+  "Ninja Xpress",
+  "GoTo Logistics",
+  "Lazada Express",
 ];
 
 const chartTooltip = {
@@ -64,8 +43,7 @@ export const Route = createFileRoute("/_app/operations")({
       { title: "Operations Intelligence — FlowOps" },
       {
         name: "description",
-        content:
-          "Audit Center, operational KPIs, performance analytics and warehouse activity timeline.",
+        content: "Audit Center, operational KPIs, performance analytics and warehouse activity timeline.",
       },
     ],
   }),
@@ -131,16 +109,32 @@ function OperationsPage() {
 
       <Tabs defaultValue="audit" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="audit"><Activity className="h-3.5 w-3.5" /> Audit Center</TabsTrigger>
-          <TabsTrigger value="kpis"><Package className="h-3.5 w-3.5" /> KPI Dashboard</TabsTrigger>
-          <TabsTrigger value="performance"><UsersIcon className="h-3.5 w-3.5" /> Performance</TabsTrigger>
-          <TabsTrigger value="timeline"><Search className="h-3.5 w-3.5" /> Timeline</TabsTrigger>
+          <TabsTrigger value="audit">
+            <Activity className="h-3.5 w-3.5" /> Audit Center
+          </TabsTrigger>
+          <TabsTrigger value="kpis">
+            <Package className="h-3.5 w-3.5" /> KPI Dashboard
+          </TabsTrigger>
+          <TabsTrigger value="performance">
+            <UsersIcon className="h-3.5 w-3.5" /> Performance
+          </TabsTrigger>
+          <TabsTrigger value="timeline">
+            <Search className="h-3.5 w-3.5" /> Timeline
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="audit"><AuditCenter /></TabsContent>
-        <TabsContent value="kpis"><KpiDashboard /></TabsContent>
-        <TabsContent value="performance"><PerformanceAnalytics /></TabsContent>
-        <TabsContent value="timeline"><AuditTimeline /></TabsContent>
+        <TabsContent value="audit">
+          <AuditCenter />
+        </TabsContent>
+        <TabsContent value="kpis">
+          <KpiDashboard />
+        </TabsContent>
+        <TabsContent value="performance">
+          <PerformanceAnalytics />
+        </TabsContent>
+        <TabsContent value="timeline">
+          <AuditTimeline />
+        </TabsContent>
       </Tabs>
 
       <section className="rounded-lg border border-dashed bg-card/50 p-4">
@@ -149,8 +143,8 @@ function OperationsPage() {
           <div>
             <div className="text-sm font-semibold">AI insights & predictive analytics — Coming Soon</div>
             <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-              Operations Intelligence is wired to live warehouse data and ready for predictive
-              packing forecasts, return-risk scoring and anomaly detection. No AI is enabled yet.
+              Operations Intelligence is wired to live warehouse data and ready for predictive packing forecasts,
+              return-risk scoring and anomaly detection. No AI is enabled yet.
             </p>
           </div>
         </div>
@@ -181,7 +175,7 @@ function AuditCenter() {
         .select("*")
         .eq("workspace_id", wid!)
         .order("created_at", { ascending: false })
-        .limit(1000);
+        .limit(50000);
       if (from) q = q.gte("created_at", `${from}T00:00:00.000Z`);
       if (to) q = q.lte("created_at", `${to}T23:59:59.999Z`);
       if (userId !== "all") q = q.eq("actor_id", userId);
@@ -191,12 +185,9 @@ function AuditCenter() {
       const rows = (data ?? []) as AuditLog[];
       const ids = Array.from(new Set(rows.map((r) => r.actor_id).filter(Boolean) as string[]));
       if (ids.length) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", ids);
+        const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
         const map = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.email]));
-        for (const r of rows) r.actor_name = r.actor_id ? map.get(r.actor_id) ?? null : null;
+        for (const r of rows) r.actor_name = r.actor_id ? (map.get(r.actor_id) ?? null) : null;
       }
       return rows;
     },
@@ -229,11 +220,15 @@ function AuditCenter() {
           <div className="space-y-1.5">
             <Label className="text-xs">User</Label>
             <Select value={userId} onValueChange={setUserId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
                 {(members.data ?? []).map((m) => (
-                  <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -241,10 +236,16 @@ function AuditCenter() {
           <div className="space-y-1.5">
             <Label className="text-xs">Module</Label>
             <Select value={moduleFilter} onValueChange={setModuleFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All modules</SelectItem>
-                {modules.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
+                {modules.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -273,11 +274,11 @@ function AuditCenter() {
               const m = (l.metadata ?? {}) as Record<string, unknown>;
               return (
                 <TableRow key={l.id}>
-                  <TableCell className="text-xs whitespace-nowrap">
-                    {new Date(l.created_at).toLocaleString()}
-                  </TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleString()}</TableCell>
                   <TableCell className="text-xs">{l.actor_name ?? "—"}</TableCell>
-                  <TableCell><Badge variant="secondary">{moduleOf(l.action)}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{moduleOf(l.action)}</Badge>
+                  </TableCell>
                   <TableCell className="font-mono text-xs">{l.action}</TableCell>
                   <TableCell className="text-xs">{describe(l)}</TableCell>
                   <TableCell className="font-mono text-xs">{(m.ip as string) || "—"}</TableCell>
@@ -304,8 +305,15 @@ function AuditCenter() {
 function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
-function startOfWeek(d: Date) { const s = new Date(d); s.setDate(d.getDate() - d.getDay()); s.setHours(0,0,0,0); return s; }
-function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function startOfWeek(d: Date) {
+  const s = new Date(d);
+  s.setDate(d.getDate() - d.getDay());
+  s.setHours(0, 0, 0, 0);
+  return s;
+}
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
 
 function KpiDashboard() {
   const packs = usePackingRecords();
@@ -361,7 +369,9 @@ function KpiDashboard() {
       const k = `${r.user_id}|${r.raw_code}`;
       seen.set(k, (seen.get(k) ?? 0) + 1);
     }
-    const dupes = Array.from(seen.values()).filter((v) => v > 1).reduce((a, b) => a + (b - 1), 0);
+    const dupes = Array.from(seen.values())
+      .filter((v) => v > 1)
+      .reduce((a, b) => a + (b - 1), 0);
     return totalScans ? Math.round((dupes / totalScans) * 100) : 0;
   })();
 
@@ -388,7 +398,8 @@ function KpiDashboard() {
   const dailyTrend = useMemo(() => {
     const m = new Map<string, number>();
     for (let i = 13; i >= 0; i--) {
-      const d = new Date(now); d.setDate(now.getDate() - i);
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
       m.set(d.toISOString().slice(0, 10), 0);
     }
     for (const r of packed) {
@@ -416,7 +427,10 @@ function KpiDashboard() {
   const reasons = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of rets) m.set(r.reason || "Unknown", (m.get(r.reason || "Unknown") ?? 0) + 1);
-    return Array.from(m.entries()).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count).slice(0, 6);
+    return Array.from(m.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
   }, [rets]);
 
   const oc = orderCounts.data ?? {};
@@ -467,7 +481,11 @@ function KpiDashboard() {
                   </TableRow>
                 ))}
                 {!topPackers.length && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-4">No packing activity yet.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-4">
+                      No packing activity yet.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -491,7 +509,9 @@ function KpiDashboard() {
 
       {/* Return KPIs */}
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold flex items-center gap-2"><RotateCcw className="h-4 w-4" /> Return team</h3>
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <RotateCcw className="h-4 w-4" /> Return team
+        </h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Returns processed" value={completed.length} />
           <StatCard label="Avg resolution" value={avgResolutionHrs ? `${avgResolutionHrs}h` : "—"} />
@@ -544,7 +564,9 @@ function PerformanceAnalytics() {
       const k = new Date(r.packing_timestamp || r.created_at).toISOString().slice(0, 10);
       m.set(k, (m.get(k) ?? 0) + 1);
     }
-    return Array.from(m.entries()).sort().map(([day, count]) => ({ day: day.slice(5), count }));
+    return Array.from(m.entries())
+      .sort()
+      .map(([day, count]) => ({ day: day.slice(5), count }));
   }, [packed]);
 
   const dailyReturns = useMemo(() => {
@@ -554,60 +576,93 @@ function PerformanceAnalytics() {
       const k = new Date(r.received_at).toISOString().slice(0, 10);
       m.set(k, (m.get(k) ?? 0) + 1);
     }
-    return Array.from(m.entries()).sort().map(([day, count]) => ({ day: day.slice(5), count }));
+    return Array.from(m.entries())
+      .sort()
+      .map(([day, count]) => ({ day: day.slice(5), count }));
   }, [returns.data]);
 
   const byMarketplace = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of packed) m.set(r.marketplace || "Unknown", (m.get(r.marketplace || "Unknown") ?? 0) + 1);
-    return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    return Array.from(m.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   }, [packed]);
 
   const byCourier = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of packed) m.set(r.courier || "Unknown", (m.get(r.courier || "Unknown") ?? 0) + 1);
-    return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    return Array.from(m.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   }, [packed]);
 
   const byUser = useMemo(() => {
     const m = new Map<string, number>();
     for (const r of packed) m.set(r.user_name || "Unknown", (m.get(r.user_name || "Unknown") ?? 0) + 1);
-    return Array.from(m.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+    return Array.from(m.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
   }, [packed]);
 
   return (
     <div className="space-y-4">
       <div className="rounded-lg border bg-card p-4 shadow-card">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="space-y-1.5"><Label className="text-xs">From</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label className="text-xs">To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">From</Label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">To</Label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Marketplace</Label>
             <Select value={marketplace} onValueChange={setMarketplace}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {MARKETPLACES.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
+                {MARKETPLACES.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Courier</Label>
             <Select value={courier} onValueChange={setCourier}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                {COURIERS.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+                {COURIERS.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">User</Label>
             <Select value={userId} onValueChange={setUserId}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
-                {(members.data ?? []).map((m) => (<SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>))}
+                {(members.data ?? []).map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -670,7 +725,9 @@ function ChartCard({ title, children }: { title: string; children: React.ReactEl
     <div className="rounded-lg border bg-card p-4 shadow-card">
       <div className="text-xs font-semibold mb-2">{title}</div>
       <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">{children}</ResponsiveContainer>
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -701,7 +758,9 @@ function AuditTimeline() {
       // Packing records
       let pq = supabase
         .from("packing_records")
-        .select("id, raw_code, order_number, tracking_number, marketplace, courier, status, user_name, created_at, packing_timestamp")
+        .select(
+          "id, raw_code, order_number, tracking_number, marketplace, courier, status, user_name, created_at, packing_timestamp",
+        )
         .eq("workspace_id", wid!)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -714,7 +773,9 @@ function AuditTimeline() {
       // Returns
       let rq = supabase
         .from("returns")
-        .select("id, rma, return_number, order_number, tracking_number, marketplace, customer_name, status, resolution, received_at, completed_at, inspector_name, assigned_to_name")
+        .select(
+          "id, rma, return_number, order_number, tracking_number, marketplace, customer_name, status, resolution, received_at, completed_at, inspector_name, assigned_to_name",
+        )
         .eq("workspace_id", wid!)
         .order("received_at", { ascending: false })
         .limit(200);
@@ -771,9 +832,16 @@ function AuditTimeline() {
       const entries: TimelineEntry[] = [];
 
       for (const x of (p.data ?? []) as Array<{
-        id: string; raw_code: string; order_number: string | null; tracking_number: string | null;
-        marketplace: string | null; courier: string | null; status: string; user_name: string;
-        created_at: string; packing_timestamp: string | null;
+        id: string;
+        raw_code: string;
+        order_number: string | null;
+        tracking_number: string | null;
+        marketplace: string | null;
+        courier: string | null;
+        status: string;
+        user_name: string;
+        created_at: string;
+        packing_timestamp: string | null;
       }>) {
         entries.push({
           id: `p-${x.id}`,
@@ -782,14 +850,25 @@ function AuditTimeline() {
           user: x.user_name,
           module: x.status === "Packed" ? "Packing" : "Scanning",
           title: x.status === "Packed" ? "Order packed" : `Scan · ${x.status}`,
-          description: [x.order_number, x.tracking_number, x.marketplace, x.courier].filter(Boolean).join(" · ") || x.raw_code,
+          description:
+            [x.order_number, x.tracking_number, x.marketplace, x.courier].filter(Boolean).join(" · ") || x.raw_code,
         });
       }
 
       for (const x of (r.data ?? []) as Array<{
-        id: string; rma: string; return_number: string | null; order_number: string | null; tracking_number: string | null;
-        marketplace: string | null; customer_name: string | null; status: string; resolution: string | null;
-        received_at: string; completed_at: string | null; inspector_name: string | null; assigned_to_name: string | null;
+        id: string;
+        rma: string;
+        return_number: string | null;
+        order_number: string | null;
+        tracking_number: string | null;
+        marketplace: string | null;
+        customer_name: string | null;
+        status: string;
+        resolution: string | null;
+        received_at: string;
+        completed_at: string | null;
+        inspector_name: string | null;
+        assigned_to_name: string | null;
       }>) {
         entries.push({
           id: `r-${x.id}`,
@@ -798,7 +877,9 @@ function AuditTimeline() {
           user: x.inspector_name || x.assigned_to_name,
           module: "Returns",
           title: x.completed_at ? `Return resolved · ${x.resolution || x.status}` : `Return received · ${x.status}`,
-          description: [x.rma, x.order_number, x.tracking_number, x.marketplace, x.customer_name].filter(Boolean).join(" · "),
+          description: [x.rma, x.order_number, x.tracking_number, x.marketplace, x.customer_name]
+            .filter(Boolean)
+            .join(" · "),
         });
       }
 
@@ -807,7 +888,7 @@ function AuditTimeline() {
           id: `a-${x.id}`,
           at: x.created_at,
           kind: "audit",
-          user: x.actor_id ? profiles.get(x.actor_id) ?? null : null,
+          user: x.actor_id ? (profiles.get(x.actor_id) ?? null) : null,
           module: moduleOf(x.action),
           title: x.action,
           description: describe(x),
@@ -820,7 +901,10 @@ function AuditTimeline() {
         const kept = new Set<string>();
         for (const e of entries) {
           for (const n of skuOrderNumbers) {
-            if (e.description.includes(n)) { kept.add(e.id); break; }
+            if (e.description.includes(n)) {
+              kept.add(e.id);
+              break;
+            }
           }
         }
         // Combine SKU-matched entries with text-matched entries (already in result).
@@ -836,11 +920,7 @@ function AuditTimeline() {
       <div className="rounded-lg border bg-card p-4 shadow-card">
         <Label className="text-xs">Search by order #, tracking, user or SKU</Label>
         <div className="mt-1.5 flex gap-2">
-          <Input
-            placeholder="Type and press Enter…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Type and press Enter…" value={search} onChange={(e) => setSearch(e.target.value)} />
           <Button variant="outline" onClick={() => setSearch("")} disabled={!search}>
             Clear
           </Button>
@@ -860,9 +940,7 @@ function AuditTimeline() {
                 </div>
                 <div className="text-xs text-muted-foreground truncate">{e.description}</div>
               </div>
-              <div className="text-xs text-muted-foreground whitespace-nowrap">
-                {new Date(e.at).toLocaleString()}
-              </div>
+              <div className="text-xs text-muted-foreground whitespace-nowrap">{new Date(e.at).toLocaleString()}</div>
             </li>
           ))}
           {!(data.data ?? []).length && (
