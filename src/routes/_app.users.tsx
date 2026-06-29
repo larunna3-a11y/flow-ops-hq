@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { UserPlus, MoreHorizontal, Mail, Copy, MessageCircle, Link as LinkIcon } from "lucide-react";
+import { UserPlus, MoreHorizontal, Mail, Copy, MessageCircle, Link as LinkIcon, Download, Files } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
