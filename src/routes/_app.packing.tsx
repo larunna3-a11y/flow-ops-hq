@@ -1,17 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ScanLine,
+  QrCode,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Camera,
+  RefreshCw,
+  X,
+  PackageCheck,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatCard } from "@/components/stat-card";
 import { StatusPill, statusToTone } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
-import { useImports } from "@/lib/use-orders-data";
-import { useWorkspace, useCurrentUser } from "@/lib/use-workspace";
-import { supabase } from "@/integrations/supabase/client";
-import { parseDestyFile, type DestyParseResult } from "@/lib/desty-parser";
-import { toast } from "sonner";
-import { Upload, FileSpreadsheet, CheckCircle2, Loader2, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,411 +34,909 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/lib/use-workspace";
+import { usePackingRecords } from "@/lib/use-warehouse-data";
+import { logActivity } from "@/lib/activity.functions";
+import { notify } from "@/lib/notify";
+import { detect, type DetectionResult } from "@/lib/detection";
+import { MARKETPLACES, COURIERS, useOrders } from "@/lib/use-orders-data";
 
-export const Route = createFileRoute("/_app/imports")({
-  head: () => ({ meta: [{ title: "Import Orders — FlowOps" }] }),
-  component: ImportsPage,
+export const Route = createFileRoute("/_app/packing")({
+  head: () => ({
+    meta: [
+      { title: "Packing — FlowOps" },
+      { name: "description", content: "Scan, verify, and confirm packing in one workflow." },
+    ],
+  }),
+  component: PackingPage,
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as any;
+type OrderItem = {
+  id: string;
+  sku: string;
+  sku_marketplace?: string | null;
+  sku_master?: string | null;
+  product_name: string;
+  product_variant: string | null;
+  quantity: number;
+  warehouse_location: string | null;
+};
 
-function ImportsPage() {
+type LookupOrder = {
+  id: string;
+  order_number: string;
+  tracking_number: string | null;
+  marketplace: string | null;
+  store_name: string | null;
+  courier: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  packing_status: string;
+  order_status: string;
+  items: OrderItem[];
+};
+
+type ScanState = {
+  code: string;
+  scanType: "keyboard" | "camera";
+  order: LookupOrder | null;
+  duplicate: { id: string; created_at: string; user_name: string } | null;
+  notFound: boolean;
+  loading: boolean;
+  detection: DetectionResult | null;
+  override: { marketplace: string | null; courier: string | null };
+  verifiedItems: Record<string, boolean>;
+  missingQty: Record<string, number>;
+  /** If set, we're editing an existing packing_record instead of creating a new one */
+  editingRecordId: string | null;
+};
+
+const INITIAL_STATE: ScanState = {
+  code: "",
+  scanType: "keyboard",
+  order: null,
+  duplicate: null,
+  notFound: false,
+  loading: false,
+  detection: null,
+  override: { marketplace: null, courier: null },
+  verifiedItems: {},
+  missingQty: {},
+  editingRecordId: null,
+};
+
+function detectDevice() {
+  if (typeof navigator === "undefined") return "Unknown";
+  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? "Mobile" : "Desktop";
+}
+
+function PackingPage() {
   const { t } = useTranslation();
-  const imports = useImports();
-  const ws = useWorkspace();
-  const user = useCurrentUser();
   const qc = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const ws = useWorkspace();
+  const log = useServerFn(logActivity);
+  const codeRef = useRef<HTMLInputElement>(null);
 
-  const [parsing, setParsing] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [preview, setPreview] = useState<(DestyParseResult & { filename: string; parsedAt: string }) | null>(null);
+  const [scan, setScan] = useState<ScanState>(INITIAL_STATE);
+  const [submitting, setSubmitting] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
-  // Delete state
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; filename: string } | null>(null);
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; orderNumber: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const role = ws.data?.role ?? null;
+  const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
   const canDelete = role === "Owner" || role === "Supervisor";
 
-  async function onFileChosen(file: File) {
-    setParsing(true);
-    setPreview(null);
-    try {
-      const result = await parseDestyFile(file);
-      setPreview({ ...result, filename: file.name, parsedAt: new Date().toISOString() });
-      toast.success(`Detected Desty OMS export — ${result.orders.length} orders, ${result.totalItems} items`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't read this file.");
-    } finally {
-      setParsing(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  }
+  const recordsQuery = usePackingRecords();
+  const records = recordsQuery.data ?? [];
+  const ordersQuery = useOrders();
 
-  async function confirmImport() {
-    if (!preview) return;
-    const wid = ws.data?.workspace?.id;
-    if (!wid) {
-      toast.error("No active workspace.");
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  // totalOrders  = all orders (fixed base from this import batch)
+  // inQueue      = orders still packing_status === "pending"  → live, decrements as packs confirmed
+  // packedOrders = orders with packing_status === "packed" or "packed_with_missing"
+  // packedToday  = packing records created today (not Pending/Cancelled)
+  const kpis = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayIso = today.toISOString();
+    const todayRecords = records.filter((r) => r.created_at >= todayIso);
+    const orders = ordersQuery.data ?? [];
+
+    const totalOrders = orders.length;
+    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
+    const packedOrders = orders.filter(
+      (o) => o.packing_status === "packed" || o.packing_status === "packed_with_missing",
+    ).length;
+    // Progress 0–100 of how many orders have been packed out of total
+    const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
+
+    return {
+      totalOrders,
+      inQueue,
+      packedOrders,
+      packProgress,
+      activePackers: new Set(todayRecords.map((r) => r.user_id)).size,
+      packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
+      shipped: records.filter((r) => r.status === "Shipped").length,
+    };
+  }, [records, ordersQuery.data]);
+
+  async function lookup(code: string, scanType: "keyboard" | "camera") {
+    const value = code.trim();
+    if (!value) return;
+    const workspace = ws.data?.workspace;
+    if (!workspace) {
+      toast.error("Workspace not loaded");
       return;
     }
-    setImporting(true);
-    let success = 0;
-    let duplicates = 0;
-    let failed = 0;
+    setScan({ ...INITIAL_STATE, code: value, scanType, loading: true });
 
+    let detection: DetectionResult;
     try {
-      // Find duplicates: existing order_numbers in this workspace
-      const orderNumbers = preview.orders.map((o) => o.order_number);
-      const { data: existing } = await db
-        .from("orders")
-        .select("order_number")
-        .eq("workspace_id", wid)
-        .in("order_number", orderNumbers);
-      const existingSet = new Set((existing ?? []).map((r: { order_number: string }) => r.order_number));
+      detection = await detect(value, { workspaceId: workspace.id });
+    } catch (err) {
+      toast.error((err as Error).message);
+      setScan((s) => ({ ...s, loading: false }));
+      return;
+    }
 
-      const toInsert = preview.orders.filter((o) => {
-        if (existingSet.has(o.order_number)) {
-          duplicates++;
-          return false;
-        }
-        return true;
-      });
+    let order: LookupOrder | null = null;
+    const tryNumbers = [value];
+    if (detection.orderNumber && detection.orderNumber !== value) tryNumbers.push(detection.orderNumber);
+    if (detection.trackingNumber && !tryNumbers.includes(detection.trackingNumber))
+      tryNumbers.push(detection.trackingNumber);
 
-      // Insert orders in chunks
-      const CHUNK = 200;
-      for (let i = 0; i < toInsert.length; i += CHUNK) {
-        const slice = toInsert.slice(i, i + CHUNK);
-        const orderRows = slice.map((o) => ({
-          workspace_id: wid,
-          order_number: o.order_number,
-          tracking_number: o.tracking_number,
-          store_name: o.store_name,
-          marketplace: o.marketplace,
-          customer_name: o.customer_name,
-          courier: o.courier,
-          ordered_at: o.ordered_at,
-          order_status: "new",
-          packing_status: "pending",
-          shipping_status: "pending",
+    const orClauses = tryNumbers.flatMap((n) => [`order_number.eq.${n}`, `tracking_number.eq.${n}`]).join(",");
+
+    const { data: orderRow } = await supabase
+      .from("orders")
+      .select(
+        "id, order_number, tracking_number, marketplace, store_name, courier, customer_name, customer_phone, packing_status, order_status",
+      )
+      .eq("workspace_id", workspace.id)
+      .or(orClauses)
+      .limit(1)
+      .maybeSingle();
+
+    if (orderRow) {
+      const { data: items } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("order_id", orderRow.id)
+        .order("created_at", { ascending: true });
+      order = {
+        ...orderRow,
+        items: (items ?? []).map((it: Record<string, unknown>) => ({
+          id: it.id as string,
+          sku: (it.sku as string) ?? "",
+          sku_marketplace: (it.sku_marketplace as string | null) ?? null,
+          sku_master: (it.sku_master as string | null) ?? null,
+          product_name: (it.product_name as string) ?? "",
+          product_variant: (it.product_variant as string | null) ?? null,
+          quantity: (it.quantity as number) ?? 0,
+          warehouse_location: (it.warehouse_location as string | null) ?? null,
+        })),
+      };
+    }
+
+    const orList = [`raw_code.eq.${value}`];
+    const trackingForDup = order?.tracking_number ?? detection.trackingNumber;
+    if (trackingForDup && trackingForDup !== value) orList.push(`tracking_number.eq.${trackingForDup}`);
+    const { data: dups } = await supabase
+      .from("packing_records")
+      .select("id, created_at, user_name")
+      .eq("workspace_id", workspace.id)
+      .or(orList.join(","))
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const duplicate = dups && dups.length > 0 ? dups[0] : null;
+
+    setScan({
+      code: value,
+      scanType,
+      order,
+      duplicate,
+      notFound: !order,
+      loading: false,
+      detection,
+      override: {
+        marketplace: order?.marketplace ?? detection.marketplace,
+        courier: order?.courier ?? detection.courier,
+      },
+      verifiedItems: {},
+      missingQty: {},
+      editingRecordId: null,
+    });
+  }
+
+  /** Load an existing packing_record back into the scan form for re-editing */
+  async function startEdit(recordId: string) {
+    const workspace = ws.data?.workspace;
+    if (!workspace) return;
+
+    setScan({ ...INITIAL_STATE, loading: true });
+
+    // Fetch the packing record
+    const { data: rec, error: recErr } = await supabase
+      .from("packing_records")
+      .select("*")
+      .eq("id", recordId)
+      .maybeSingle();
+
+    if (recErr || !rec) {
+      toast.error("Could not load packing record for editing.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
+    // Fetch the associated order
+    const orderCode = rec.order_number ?? rec.tracking_number ?? rec.raw_code;
+    if (!orderCode) {
+      toast.error("No order reference found on this record.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
+    const orClauses = [`order_number.eq.${orderCode}`, `tracking_number.eq.${orderCode}`].join(",");
+    const { data: orderRow } = await supabase
+      .from("orders")
+      .select(
+        "id, order_number, tracking_number, marketplace, store_name, courier, customer_name, customer_phone, packing_status, order_status",
+      )
+      .eq("workspace_id", workspace.id)
+      .or(orClauses)
+      .limit(1)
+      .maybeSingle();
+
+    let order: LookupOrder | null = null;
+    if (orderRow) {
+      const { data: items } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("order_id", orderRow.id)
+        .order("created_at", { ascending: true });
+      order = {
+        ...orderRow,
+        items: (items ?? []).map((it: Record<string, unknown>) => ({
+          id: it.id as string,
+          sku: (it.sku as string) ?? "",
+          sku_marketplace: (it.sku_marketplace as string | null) ?? null,
+          sku_master: (it.sku_master as string | null) ?? null,
+          product_name: (it.product_name as string) ?? "",
+          product_variant: (it.product_variant as string | null) ?? null,
+          quantity: (it.quantity as number) ?? 0,
+          warehouse_location: (it.warehouse_location as string | null) ?? null,
+        })),
+      };
+    }
+
+    // Restore verified items from the saved record
+    const savedVerified: Record<string, boolean> = {};
+    const savedMissing: Record<string, number> = {};
+    const verifiedSkus: Array<{ item_id: string }> = (rec.verified_skus as Array<{ item_id: string }>) ?? [];
+    const missingSkus: Array<{ item_id: string; missing_quantity: number }> =
+      (rec.missing_skus as Array<{ item_id: string; missing_quantity: number }>) ?? [];
+
+    for (const vs of verifiedSkus) savedVerified[vs.item_id] = true;
+    for (const ms of missingSkus) savedMissing[ms.item_id] = ms.missing_quantity;
+
+    toast.info(`Editing packing record for ${rec.order_number ?? orderCode}`);
+
+    setScan({
+      code: rec.raw_code ?? orderCode,
+      scanType: "keyboard",
+      order,
+      duplicate: null, // editing = we own this record
+      notFound: !order,
+      loading: false,
+      detection: null,
+      override: {
+        marketplace: rec.marketplace ?? order?.marketplace ?? null,
+        courier: rec.courier ?? order?.courier ?? null,
+      },
+      verifiedItems: savedVerified,
+      missingQty: savedMissing,
+      editingRecordId: recordId,
+    });
+
+    // Scroll to the verification panel
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
+  }
+
+  function resetScan() {
+    setScan(INITIAL_STATE);
+    setTimeout(() => codeRef.current?.focus(), 50);
+  }
+
+  function toggleVerified(id: string) {
+    setScan((s) => ({ ...s, verifiedItems: { ...s.verifiedItems, [id]: !s.verifiedItems[id] } }));
+  }
+
+  function verifyAll() {
+    if (!scan.order) return;
+    const map: Record<string, boolean> = {};
+    scan.order.items.forEach((i) => (map[i.id] = true));
+    setScan((s) => ({ ...s, verifiedItems: map }));
+  }
+
+  const allVerified =
+    !!scan.order && scan.order.items.length > 0 && scan.order.items.every((i) => scan.verifiedItems[i.id]);
+
+  function setMissingQty(id: string, qty: number) {
+    setScan((s) => ({ ...s, missingQty: { ...s.missingQty, [id]: Math.max(0, qty) } }));
+  }
+
+  async function confirmPacking() {
+    const order = scan.order;
+    const workspace = ws.data?.workspace;
+    const userId = ws.data?.userId;
+    if (!order || !workspace || !userId) return;
+    if (scan.duplicate && !canOverrideDuplicate && !scan.editingRecordId) {
+      toast.error("Duplicate — only Owner or Supervisor can confirm.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const me = await supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle();
+      const userName = me.data?.full_name || me.data?.email || "Operator";
+      const nowIso = new Date().toISOString();
+      const device = detectDevice();
+      const finalMarketplace = scan.override.marketplace ?? order.marketplace;
+      const finalCourier = scan.override.courier ?? order.courier;
+
+      const verifiedSkus = order.items
+        .filter((i) => scan.verifiedItems[i.id])
+        .map((i) => ({
+          item_id: i.id,
+          sku_marketplace: i.sku_marketplace ?? i.sku ?? null,
+          sku_master: i.sku_master ?? i.sku ?? null,
+          quantity: i.quantity,
         }));
-        const { data: inserted, error } = await db.from("orders").insert(orderRows).select("id, order_number");
+      const missingSkus = order.items
+        .filter((i) => !scan.verifiedItems[i.id] || (scan.missingQty[i.id] ?? 0) > 0)
+        .map((i) => {
+          const missing = scan.verifiedItems[i.id] ? Math.min(scan.missingQty[i.id] ?? 0, i.quantity) : i.quantity;
+          return {
+            item_id: i.id,
+            sku_marketplace: i.sku_marketplace ?? i.sku ?? null,
+            sku_master: i.sku_master ?? i.sku ?? null,
+            ordered_quantity: i.quantity,
+            missing_quantity: missing,
+          };
+        })
+        .filter((m) => m.missing_quantity > 0);
+      const totalMissing = missingSkus.reduce((sum, m) => sum + m.missing_quantity, 0);
+      const completionStatus = totalMissing > 0 ? "Packed with Missing Items" : "Complete";
+      const packingStatusValue = totalMissing > 0 ? "Packed with Missing Items" : "Packed";
+
+      const recordPayload = {
+        workspace_id: workspace.id,
+        user_id: userId,
+        user_name: userName,
+        role,
+        scan_timestamp: nowIso,
+        packing_timestamp: nowIso,
+        raw_code: scan.editingRecordId
+          ? scan.code // keep original raw_code on edit
+          : scan.duplicate
+            ? `${scan.code}#${Date.now()}`
+            : scan.code,
+        order_number: order.order_number,
+        tracking_number: order.tracking_number,
+        marketplace: finalMarketplace,
+        courier: finalCourier,
+        status: packingStatusValue,
+        verified_skus: verifiedSkus,
+        missing_skus: missingSkus,
+        missing_quantity: totalMissing,
+        completion_status: completionStatus,
+      };
+
+      let insertedId: string;
+
+      if (scan.editingRecordId) {
+        // ── UPDATE existing record ──────────────────────────────────────────
+        const { error } = await supabase.from("packing_records").update(recordPayload).eq("id", scan.editingRecordId);
+
         if (error) {
-          failed += slice.length;
-          continue;
+          toast.error(error.message);
+          return;
         }
-        const idByNumber = new Map<string, string>(
-          (inserted ?? []).map((r: { id: string; order_number: string }) => [r.order_number, r.id]),
+        insertedId = scan.editingRecordId;
+        toast.success(
+          totalMissing > 0
+            ? `Updated ${order.order_number} — ${totalMissing} missing item${totalMissing === 1 ? "" : "s"}`
+            : `Updated packing record for ${order.order_number}`,
         );
-        const itemRows: Record<string, unknown>[] = [];
-        for (const o of slice) {
-          const orderId = idByNumber.get(o.order_number);
-          if (!orderId) continue;
-          for (const it of o.items) {
-            itemRows.push({
-              workspace_id: wid,
-              order_id: orderId,
-              sku: it.sku,
-              sku_marketplace: it.sku_marketplace,
-              sku_master: it.sku,
-              product_name: it.product_name,
-              product_variant: it.product_variant,
-              quantity: it.quantity,
+      } else {
+        // ── INSERT new record ───────────────────────────────────────────────
+        const { data: inserted, error } = await supabase
+          .from("packing_records")
+          .insert(recordPayload)
+          .select("id, order_number")
+          .single();
+
+        if (error) {
+          if (error.code === "23505") {
+            toast.warning("Duplicate barcode or tracking number");
+            notify({
+              type: "scan.duplicate",
+              title: "Duplicate scan blocked",
+              body: `${order.order_number} — tracking ${order.tracking_number ?? "—"} was already scanned.`,
+              severity: "warning",
+              link: "/packing",
+              roles: ["Supervisor", "Owner"],
+              metadata: { order_number: order.order_number, tracking_number: order.tracking_number },
             });
+          } else {
+            toast.error(error.message);
           }
+          return;
         }
-        if (itemRows.length) {
-          const { error: itemErr } = await db.from("order_items").insert(itemRows);
-          if (itemErr) {
-            failed += itemRows.length;
-          }
-        }
-        success += inserted?.length ?? 0;
+        insertedId = inserted.id;
+        toast.success(
+          totalMissing > 0
+            ? `Packed ${order.order_number} with ${totalMissing} missing item${totalMissing === 1 ? "" : "s"}`
+            : `Packed ${order.order_number}`,
+        );
       }
 
-      // Record import batch
-      await db.from("imports").insert({
-        workspace_id: wid,
-        imported_by: user.data?.id ?? null,
-        imported_by_name: user.data?.user_metadata?.full_name ?? user.data?.email ?? null,
-        filename: preview.filename,
-        total_rows: preview.totalRows,
-        success_count: success,
-        failed_count: failed,
-        duplicate_count: duplicates,
-        status: failed > 0 ? "completed_with_errors" : "completed",
-      });
+      // Update the order row to reflect the new packing status
+      await supabase
+        .from("orders")
+        .update({
+          packing_status: totalMissing > 0 ? "packed_with_missing" : "packed",
+          order_status: packingStatusValue,
+          shipping_status: "Packed",
+          packed_by: userId,
+          packed_by_name: userName,
+          packed_at: nowIso,
+        })
+        .eq("id", order.id);
 
-      toast.success(`Imported ${success} orders (${duplicates} duplicates skipped)`);
-      setPreview(null);
+      await log({
+        data: {
+          action: scan.editingRecordId ? "packing.updated" : "packing.confirmed",
+          target_type: "packing_record",
+          target_id: insertedId,
+          metadata: {
+            order_id: order.id,
+            order_number: order.order_number,
+            tracking_number: order.tracking_number,
+            marketplace: finalMarketplace,
+            courier: finalCourier,
+            device,
+            scan_type: scan.scanType,
+            override_duplicate: !!scan.duplicate,
+            completion_status: completionStatus,
+            missing_quantity: totalMissing,
+            missing_skus_count: missingSkus.length,
+            edited: !!scan.editingRecordId,
+          },
+        },
+      }).catch(() => undefined);
+
+      qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
-      qc.invalidateQueries({ queryKey: ["order_items"] });
-      qc.invalidateQueries({ queryKey: ["imports"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
-      qc.invalidateQueries({ queryKey: ["packing"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Import failed.");
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
+      qc.invalidateQueries({ queryKey: ["audit_logs"] });
+      resetScan();
     } finally {
-      setImporting(false);
+      setSubmitting(false);
     }
   }
 
-  /**
-   * Delete an import batch record AND all the orders/items that came with it.
-   * We identify them by the filename + workspace (the import record itself doesn't
-   * store a foreign key back to the orders, so we delete the orders that were
-   * created around the same time window by matching order_number patterns is not
-   * reliable — instead we delete the import log row only and leave orders intact,
-   * which is the safest behaviour. The user re-imports after deletion to start fresh.)
-   *
-   * If the user wants orders deleted too they can use the Orders page filters.
-   * We ask them clearly in the confirmation dialog.
-   */
-  async function deleteImport(id: string, deleteOrders: boolean) {
-    const wid = ws.data?.workspace?.id;
-    if (!wid) return;
+  async function deleteRecord(id: string) {
+    if (!canDelete) return;
+    const workspace = ws.data?.workspace;
+    if (!workspace) return;
     setDeleting(true);
     try {
-      if (deleteOrders) {
-        // Find the import record to get its creation time window
-        const { data: imp, error: fetchErr } = await db
-          .from("imports")
-          .select("created_at, filename")
-          .eq("id", id)
-          .maybeSingle();
-        if (fetchErr) {
-          toast.error(`Could not read import: ${fetchErr.message}`);
-          return;
-        }
-        if (imp) {
-          // Orders were inserted just before the import row was written,
-          // so use a ±90 second window to be safe.
-          const createdAt = new Date(imp.created_at);
-          const from = new Date(createdAt.getTime() - 90_000).toISOString();
-          const to = new Date(createdAt.getTime() + 90_000).toISOString();
+      const { error } = await supabase.from("packing_records").delete().eq("id", id).eq("workspace_id", workspace.id);
 
-          const { data: orderRows, error: orderFetchErr } = await db
-            .from("orders")
-            .select("id")
-            .eq("workspace_id", wid)
-            .gte("created_at", from)
-            .lte("created_at", to);
-
-          if (orderFetchErr) {
-            toast.error(`Could not fetch orders: ${orderFetchErr.message}`);
-            return;
-          }
-
-          const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
-
-          if (orderIds.length) {
-            // Delete order_items first to satisfy FK constraints
-            const { error: itemsErr } = await db
-              .from("order_items")
-              .delete()
-              .eq("workspace_id", wid)
-              .in("order_id", orderIds);
-            if (itemsErr) {
-              toast.error(`Could not delete order items: ${itemsErr.message}`);
-              return;
-            }
-
-            const { error: ordersErr } = await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
-            if (ordersErr) {
-              toast.error(`Could not delete orders: ${ordersErr.message}`);
-              return;
-            }
-          }
-        }
-      }
-
-      // Delete the import log row (requires the "Managers delete imports" RLS policy)
-      const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
       if (error) {
-        toast.error(`Could not delete import record: ${error.message}`);
+        toast.error(error.message);
         return;
       }
 
-      toast.success(deleteOrders ? "Import and associated orders deleted." : "Import record deleted.");
-      qc.invalidateQueries({ queryKey: ["imports"] });
+      toast.success("Packing record deleted.");
+      qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
-      qc.invalidateQueries({ queryKey: ["order_items"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Delete failed.");
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
     }
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    lookup(scan.code, "keyboard");
+  }
+
+  const totalSku = scan.order?.items.length ?? 0;
+  const totalQty = scan.order?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Import Orders"
-        description="Upload your Desty OMS order export. We'll detect the format automatically."
+        title={t("packing.title")}
+        description={t("packing.description")}
+        actions={
+          <>
+            <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
+              <Camera className="h-4 w-4" /> Camera
+            </Button>
+            <Button size="sm" onClick={() => codeRef.current?.focus()}>
+              <ScanLine className="h-4 w-4" /> Focus scanner
+            </Button>
+          </>
+        }
       />
 
-      {/* Uploader */}
-      <div className="rounded-lg border bg-card shadow-card p-6">
-        <div className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-border bg-muted/30 py-10 px-4 text-center">
-          <FileSpreadsheet className="h-10 w-10 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">Drop your Desty OMS Excel file here</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              No template, no mapping. Upload the original .xlsx export.
-            </p>
+      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Total Orders — fixed base */}
+        <StatCard
+          label="Total Orders"
+          value={String(kpis.totalOrders)}
+          hint={kpis.totalOrders > 0 ? `${kpis.packProgress}% packed` : undefined}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+
+        {/* Pending / In Queue — live countdown: decrements as packs are confirmed */}
+        <div className="rounded-lg border bg-card p-5 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("packing.kpis.inQueue")}
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground">
+              <PackageCheck className="h-4 w-4" />
+            </div>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFileChosen(f);
-            }}
-          />
-          <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={parsing || importing}>
-            {parsing ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Reading file…
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Choose file
-              </>
-            )}
-          </Button>
+          <div className="mt-3 flex items-baseline gap-2">
+            <div className="text-2xl font-semibold tracking-tight text-foreground">{kpis.inQueue}</div>
+            {kpis.totalOrders > 0 && <span className="text-xs text-muted-foreground">/ {kpis.totalOrders}</span>}
+          </div>
+          {/* Progress bar: fills as orders get packed */}
+          {kpis.totalOrders > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                <span>{kpis.packedOrders} packed</span>
+                <span>{kpis.inQueue} remaining</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-success transition-all duration-500"
+                  style={{ width: `${kpis.packProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
+
+        <StatCard
+          label={t("packing.kpis.activePackers")}
+          value={String(kpis.activePackers)}
+          icon={<QrCode className="h-4 w-4" />}
+        />
+        <StatCard label="Packed today" value={String(kpis.packedToday)} icon={<CheckCircle2 className="h-4 w-4" />} />
       </div>
 
-      {/* Preview */}
-      {preview && (
-        <div className="rounded-lg border bg-card shadow-card p-6 space-y-4">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div>
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                <span className="font-medium">Desty OMS format detected</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{preview.filename}</p>
+      {/* ── Scan input ─────────────────────────────────────────────────────── */}
+      {!scan.editingRecordId && (
+        <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <div className="space-y-1.5">
+              <Label htmlFor="raw_code">Scan barcode / QR / tracking number</Label>
+              <Input
+                id="raw_code"
+                ref={codeRef}
+                value={scan.code}
+                onChange={(e) => setScan((s) => ({ ...s, code: e.target.value }))}
+                placeholder="Scan with USB scanner, type, or search…"
+                autoFocus
+                autoComplete="off"
+              />
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setPreview(null)} disabled={importing}>
-                Cancel
+            <div className="flex items-end">
+              <Button type="submit" disabled={scan.loading || !scan.code.trim()}>
+                {scan.loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Lookup
               </Button>
-              <Button onClick={confirmImport} disabled={importing}>
-                {importing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Importing…
-                  </>
-                ) : (
-                  `Import ${preview.orders.length} orders`
-                )}
+            </div>
+            <div className="flex items-end">
+              <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
+                <Camera className="h-4 w-4" /> Use camera
               </Button>
             </div>
           </div>
+        </form>
+      )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Stat label="Total Orders" value={preview.orders.length} />
-            <Stat label="Total Order Items" value={preview.totalItems} />
-            <Stat label="Import Date" value={new Date(preview.parsedAt).toLocaleString()} mono />
+      {scan.notFound && (
+        <div className="rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            No order matches <span className="font-mono">{scan.code}</span>.
           </div>
-
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Order #</TableHead>
-                  <TableHead>Marketplace</TableHead>
-                  <TableHead>Store</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Courier</TableHead>
-                  <TableHead>Tracking</TableHead>
-                  <TableHead className="text-right">Items</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {preview.orders.slice(0, 25).map((o) => (
-                  <TableRow key={o.order_number}>
-                    <TableCell className="font-mono text-xs">{o.order_number}</TableCell>
-                    <TableCell>{o.marketplace ?? "—"}</TableCell>
-                    <TableCell>{o.store_name ?? "—"}</TableCell>
-                    <TableCell>{o.customer_name ?? "—"}</TableCell>
-                    <TableCell className="text-xs">{o.courier ?? "—"}</TableCell>
-                    <TableCell className="font-mono text-xs">{o.tracking_number ?? "—"}</TableCell>
-                    <TableCell className="text-right">{o.items.length}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {preview.orders.length > 25 && (
-              <div className="px-4 py-2 text-xs text-muted-foreground border-t bg-muted/30">
-                Showing first 25 of {preview.orders.length} orders.
-              </div>
-            )}
+          <p className="mt-1 text-muted-foreground">
+            Verify the order is imported, or try a different code. Tracking/order numbers must match exactly.
+          </p>
+          <div className="mt-3">
+            <Button size="sm" variant="outline" onClick={resetScan}>
+              <RefreshCw className="h-4 w-4" /> Rescan
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Import history */}
-      <div>
-        <h2 className="text-sm font-semibold text-muted-foreground mb-2">Import history</h2>
-        <div className="rounded-lg border bg-card shadow-card overflow-hidden">
+      {/* ── Verification panel ─────────────────────────────────────────────── */}
+      {scan.order && (
+        <div className="rounded-lg border bg-card shadow-card">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-sm font-semibold">
+                {scan.editingRecordId ? "Re-editing packing submission" : "Packing verification"}
+              </h3>
+              {scan.editingRecordId && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600">
+                  <Pencil className="h-3 w-3" /> Editing existing record
+                </span>
+              )}
+              <StatusPill tone={statusToTone(scan.order.packing_status.toLowerCase())}>
+                {scan.order.packing_status}
+              </StatusPill>
+              {scan.duplicate && !scan.editingRecordId && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                  <AlertTriangle className="h-3 w-3" /> Already packed{" "}
+                  {new Date(scan.duplicate.created_at).toLocaleString()} by {scan.duplicate.user_name}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {scan.editingRecordId ? "Edit mode" : scan.scanType === "camera" ? "Camera scan" : "Keyboard scan"}
+            </span>
+          </div>
+
+          <div className="grid gap-4 p-4 md:grid-cols-4">
+            <div>
+              <div className="text-xs text-muted-foreground">Order #</div>
+              <div className="font-mono text-sm">{scan.order.order_number}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Tracking #</div>
+              <div className="font-mono text-sm">{scan.order.tracking_number ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Customer</div>
+              <div className="text-sm">{scan.order.customer_name ?? "—"}</div>
+              {scan.order.customer_phone && (
+                <div className="text-xs text-muted-foreground">{scan.order.customer_phone}</div>
+              )}
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Store</div>
+              <div className="text-sm">{scan.order.store_name ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Marketplace</div>
+              <Select
+                value={scan.override.marketplace ?? "_none"}
+                onValueChange={(v) =>
+                  setScan((s) => ({ ...s, override: { ...s.override, marketplace: v === "_none" ? null : v } }))
+                }
+              >
+                <SelectTrigger className="h-8 mt-1">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">—</SelectItem>
+                  {MARKETPLACES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Courier</div>
+              <Select
+                value={scan.override.courier ?? "_none"}
+                onValueChange={(v) =>
+                  setScan((s) => ({ ...s, override: { ...s.override, courier: v === "_none" ? null : v } }))
+                }
+              >
+                <SelectTrigger className="h-8 mt-1">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">—</SelectItem>
+                  {COURIERS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Total SKUs</div>
+              <div className="text-sm font-semibold">{totalSku}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Total items</div>
+              <div className="text-sm font-semibold">{totalQty}</div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto border-t">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>SKU Marketplace</TableHead>
+                  <TableHead>SKU Master</TableHead>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Variant</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right w-28">Missing</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scan.order.items.map((it) => {
+                  const verified = !!scan.verifiedItems[it.id];
+                  const missing = verified ? Math.min(scan.missingQty[it.id] ?? 0, it.quantity) : it.quantity;
+                  const rowTone = !verified ? "bg-warning/5" : missing > 0 ? "bg-warning/5" : "bg-success/5";
+                  return (
+                    <TableRow key={it.id} className={rowTone}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={verified}
+                          onChange={() => toggleVerified(it.id)}
+                          className="h-4 w-4 cursor-pointer"
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{it.sku_marketplace ?? it.sku ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {it.sku_master ?? it.sku ?? "—"}
+                      </TableCell>
+                      <TableCell>{it.product_name}</TableCell>
+                      <TableCell className="text-muted-foreground">{it.product_variant ?? "—"}</TableCell>
+                      <TableCell className="text-right">{it.quantity}</TableCell>
+                      <TableCell className="text-right">
+                        {verified ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            max={it.quantity}
+                            value={scan.missingQty[it.id] ?? 0}
+                            onChange={(e) => setMissingQty(it.id, Number(e.target.value) || 0)}
+                            className="h-8 w-20 ml-auto text-right"
+                          />
+                        ) : (
+                          <span className="text-xs text-warning font-medium">{it.quantity} missing</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {!scan.order.items.length && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
+                      No items registered for this order yet.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3">
+            <Button variant="ghost" onClick={resetScan} type="button">
+              <X className="h-4 w-4" /> Cancel
+            </Button>
+            <Button variant="outline" onClick={verifyAll} type="button" disabled={!scan.order.items.length}>
+              <CheckCircle2 className="h-4 w-4" /> Verify all
+            </Button>
+            <Button
+              onClick={confirmPacking}
+              disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate && !scan.editingRecordId)}
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {scan.editingRecordId
+                ? "Save changes"
+                : scan.duplicate
+                  ? "Override & confirm"
+                  : allVerified
+                    ? "Confirm packing"
+                    : "Confirm with missing items"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Scan history ───────────────────────────────────────────────────── */}
+      <div className="rounded-lg border bg-card shadow-card">
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h3 className="text-sm font-semibold">Scan history</h3>
+          <span className="text-xs text-muted-foreground">
+            {recordsQuery.isFetching ? "Loading…" : t("common.updatedJustNow")}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t("imports.columns.time")}</TableHead>
-                <TableHead>{t("imports.columns.importedBy")}</TableHead>
-                <TableHead>{t("imports.columns.filename")}</TableHead>
-                <TableHead className="text-right">{t("imports.columns.total")}</TableHead>
-                <TableHead className="text-right">{t("imports.columns.success")}</TableHead>
-                <TableHead className="text-right">{t("imports.columns.failed")}</TableHead>
-                <TableHead className="text-right">{t("imports.columns.duplicates")}</TableHead>
-                <TableHead>{t("imports.columns.status")}</TableHead>
-                {canDelete && <TableHead className="text-right w-16">Delete</TableHead>}
+                <TableHead>Time</TableHead>
+                <TableHead>Order</TableHead>
+                <TableHead>Tracking</TableHead>
+                <TableHead>Marketplace</TableHead>
+                <TableHead>Courier</TableHead>
+                <TableHead>Packer</TableHead>
+                <TableHead className="text-right">Status</TableHead>
+                {(canOverrideDuplicate || canDelete) && <TableHead className="text-right w-24">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(imports.data ?? []).map((i) => (
-                <TableRow key={i.id}>
-                  <TableCell className="text-xs">{new Date(i.created_at).toLocaleString()}</TableCell>
-                  <TableCell>{i.imported_by_name ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{i.filename ?? "—"}</TableCell>
-                  <TableCell className="text-right">{i.total_rows}</TableCell>
-                  <TableCell className="text-right text-success">{i.success_count}</TableCell>
-                  <TableCell className="text-right text-destructive">{i.failed_count}</TableCell>
-                  <TableCell className="text-right">{i.duplicate_count}</TableCell>
-                  <TableCell>
-                    <StatusPill tone={statusToTone(i.status)}>{i.status}</StatusPill>
+              {records.slice(0, 100).map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {new Date(r.scan_timestamp).toLocaleString()}
                   </TableCell>
-                  {canDelete && (
+                  <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
+                  <TableCell>{r.marketplace ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
+                  <TableCell>{r.user_name}</TableCell>
+                  <TableCell className="text-right">
+                    <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
+                  </TableCell>
+                  {(canOverrideDuplicate || canDelete) && (
                     <TableCell className="text-right">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        title="Delete this import"
-                        onClick={() => setDeleteTarget({ id: i.id, filename: i.filename ?? i.id })}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Any packer can re-edit their own record; Owner/Supervisor can edit any */}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Re-edit this submission"
+                          onClick={() => startEdit(r.id)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="Delete this record"
+                            onClick={() => setDeleteTarget({ id: r.id, orderNumber: r.order_number ?? r.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
               ))}
-              {!(imports.data ?? []).length && (
+              {!records.length && (
                 <TableRow>
-                  <TableCell colSpan={canDelete ? 9 : 8} className="text-center text-sm text-muted-foreground py-8">
-                    {t("imports.empty")}
+                  <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">
+                    No scans yet. Use the form above to record your first scan.
                   </TableCell>
                 </TableRow>
               )}
@@ -435,7 +945,17 @@ function ImportsPage() {
         </div>
       </div>
 
-      {/* Delete confirmation */}
+      {/* ── Camera scanner dialog ──────────────────────────────────────────── */}
+      <CameraScanDialog
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onDetected={(value) => {
+          setCameraOpen(false);
+          lookup(value, "camera");
+        }}
+      />
+
+      {/* ── Delete confirmation dialog ────────────────────────────────────── */}
       <AlertDialog
         open={!!deleteTarget}
         onOpenChange={(open) => {
@@ -444,37 +964,22 @@ function ImportsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  You are about to delete the import record for{" "}
-                  <span className="font-mono font-semibold text-foreground">{deleteTarget?.filename}</span>.
-                </p>
-                <p>
-                  Choose what to delete — the import log only, or the import log <strong>and all orders</strong> that
-                  were created during that import batch (based on creation time). Deleting orders is irreversible.
-                </p>
-              </div>
+            <AlertDialogTitle>Delete packing record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the packing record for order{" "}
+              <span className="font-mono font-semibold">{deleteTarget?.orderNumber}</span>. The order's packing status
+              will not be automatically reverted — you may need to re-pack it. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              disabled={deleting}
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, false)}
-            >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log only
-            </Button>
             <AlertDialogAction
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, true)}
+              onClick={() => deleteTarget && deleteRecord(deleteTarget.id)}
             >
               {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log + orders
+              Delete record
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -483,11 +988,90 @@ function ImportsPage() {
   );
 }
 
-function Stat({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
+function CameraScanDialog({
+  open,
+  onOpenChange,
+  onDetected,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onDetected: (value: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [supported, setSupported] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!open) return;
+    let stream: MediaStream | null = null;
+    let raf = 0;
+    let stopped = false;
+
+    type DetectorCtor = new (opts?: { formats?: string[] }) => {
+      detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>;
+    };
+    const w = window as unknown as { BarcodeDetector?: DetectorCtor };
+    if (!w.BarcodeDetector) {
+      setSupported(false);
+      setError("Your browser does not support the native barcode detector. Use Chrome on Android, or a USB scanner.");
+      return;
+    }
+
+    const detector = new w.BarcodeDetector({
+      formats: ["qr_code", "code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "itf"],
+    });
+
+    async function start() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (!videoRef.current) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        const tick = async () => {
+          if (stopped || !videoRef.current) return;
+          try {
+            const found = await detector.detect(videoRef.current);
+            if (found.length > 0 && found[0].rawValue) {
+              onDetected(found[0].rawValue);
+              return;
+            }
+          } catch {
+            // ignore decoder errors per frame
+          }
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    }
+    start();
+
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(raf);
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [open, onDetected]);
+
   return (
-    <div className="rounded-md border bg-background p-4">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-xl font-semibold ${mono ? "font-mono text-base" : ""}`}>{value}</div>
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Camera scanner</DialogTitle>
+        </DialogHeader>
+        {error && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">{error}</div>}
+        {supported && (
+          <div className="overflow-hidden rounded-md border bg-black aspect-video">
+            <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
