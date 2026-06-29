@@ -137,9 +137,10 @@ function PackingPage() {
   const ordersQuery = useOrders();
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  // "In Queue" = orders with packing_status === "pending"
-  // "Total Orders" = all orders (used as base — decreases as orders get packed/done)
-  // "Packed today" = packing records created today that are not Pending/Cancelled
+  // totalOrders  = all orders (fixed base from this import batch)
+  // inQueue      = orders still packing_status === "pending"  → live, decrements as packs confirmed
+  // packedOrders = orders with packing_status === "packed" or "packed_with_missing"
+  // packedToday  = packing records created today (not Pending/Cancelled)
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -147,14 +148,19 @@ function PackingPage() {
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
     const orders = ordersQuery.data ?? [];
 
-    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
     const totalOrders = orders.length;
-    // Remaining = orders not yet packed or beyond (still pending)
-    const remaining = inQueue; // alias for clarity in display
+    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
+    const packedOrders = orders.filter(
+      (o) => o.packing_status === "packed" || o.packing_status === "packed_with_missing",
+    ).length;
+    // Progress 0–100 of how many orders have been packed out of total
+    const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
+
     return {
       totalOrders,
       inQueue,
-      remaining,
+      packedOrders,
+      packProgress,
       activePackers: new Set(todayRecords.map((r) => r.user_id)).size,
       packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
       shipped: records.filter((r) => r.status === "Shipped").length,
@@ -580,12 +586,45 @@ function PackingPage() {
 
       {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total Orders" value={String(kpis.totalOrders)} icon={<PackageCheck className="h-4 w-4" />} />
+        {/* Total Orders — fixed base */}
         <StatCard
-          label={t("packing.kpis.inQueue")}
-          value={String(kpis.inQueue)}
+          label="Total Orders"
+          value={String(kpis.totalOrders)}
+          hint={kpis.totalOrders > 0 ? `${kpis.packProgress}% packed` : undefined}
           icon={<PackageCheck className="h-4 w-4" />}
         />
+
+        {/* Pending / In Queue — live countdown: decrements as packs are confirmed */}
+        <div className="rounded-lg border bg-card p-5 shadow-card">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {t("packing.kpis.inQueue")}
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-accent-foreground">
+              <PackageCheck className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <div className="text-2xl font-semibold tracking-tight text-foreground">{kpis.inQueue}</div>
+            {kpis.totalOrders > 0 && <span className="text-xs text-muted-foreground">/ {kpis.totalOrders}</span>}
+          </div>
+          {/* Progress bar: fills as orders get packed */}
+          {kpis.totalOrders > 0 && (
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                <span>{kpis.packedOrders} packed</span>
+                <span>{kpis.inQueue} remaining</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-success transition-all duration-500"
+                  style={{ width: `${kpis.packProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         <StatCard
           label={t("packing.kpis.activePackers")}
           value={String(kpis.activePackers)}
