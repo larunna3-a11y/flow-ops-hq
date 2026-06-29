@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppTopbar } from "@/components/app-topbar";
-import { useWorkspace } from "@/lib/use-workspace";
+import { useWorkspace, useCurrentUser } from "@/lib/use-workspace";
 import { canAccess, HOME_PATH, moduleForPath } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_app")({
@@ -11,11 +11,33 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
+  const { data: user, isLoading: userLoading } = useCurrentUser();
   const { data: ws, isLoading } = useWorkspace();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const navigate = useNavigate();
   const role = ws?.role ?? null;
 
+  // 1) Not signed in → bounce to /login.
+  useEffect(() => {
+    if (userLoading) return;
+    if (!user) navigate({ to: "/login", replace: true });
+  }, [user, userLoading, navigate]);
+
+  // 2) Signed in but no workspace yet (trigger still running, or membership row
+  //    missing). Retry once after a short delay; if still missing, sign out so
+  //    the user never gets stuck on "No active workspace".
+  useEffect(() => {
+    if (userLoading || isLoading) return;
+    if (user && !ws) {
+      const t = setTimeout(() => {
+        // Best-effort: kick the user back to login to retry session/onboarding.
+        navigate({ to: "/login", replace: true });
+      }, 1500);
+      return () => clearTimeout(t);
+    }
+  }, [user, ws, userLoading, isLoading, navigate]);
+
+  // 3) Role-based route guarding (navigation + deep links).
   useEffect(() => {
     if (isLoading || !role) return;
     const module = moduleForPath(pathname);
