@@ -363,31 +363,28 @@ function UsersPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite a new user</DialogTitle>
+                <DialogTitle>Invite team members</DialogTitle>
                 <DialogDescription>
-                  Enter the team member's name and phone number. We'll generate a secure
-                  invitation link you can copy or send via WhatsApp.
+                  Paste one or many phone numbers (one per line). We'll generate a secure,
+                  single-use invitation link for each — invitees only need to enter their full
+                  name to join.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-name">Full Name</Label>
-                  <Input
-                    id="invite-name"
-                    placeholder="e.g. Aulia Rahman"
-                    value={inviteFullName}
-                    onChange={(e) => setInviteFullName(e.target.value)}
+                  <Label htmlFor="invite-phones">Phone Numbers</Label>
+                  <Textarea
+                    id="invite-phones"
+                    rows={6}
+                    placeholder={"+6281234567890\n+6289876543210\n+6285555111222"}
+                    value={bulkPhones}
+                    onChange={(e) => setBulkPhones(e.target.value)}
+                    className="font-mono text-sm"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="invite-phone">Phone Number</Label>
-                  <Input
-                    id="invite-phone"
-                    type="tel"
-                    placeholder="e.g. +6281234567890"
-                    value={invitePhone}
-                    onChange={(e) => setInvitePhone(e.target.value)}
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    {parsedPhones.length} number{parsedPhones.length === 1 ? "" : "s"} detected ·
+                    one per line, comma, or semicolon
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -418,8 +415,8 @@ function UsersPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-                <Button onClick={sendInvite} disabled={sending}>
-                  {sending ? t("common.sending") : "Create invitation"}
+                <Button onClick={sendInvite} disabled={sending || parsedPhones.length === 0}>
+                  {sending ? t("common.sending") : `Create ${parsedPhones.length || ""} invitation${parsedPhones.length === 1 ? "" : "s"}`.trim()}
                 </Button>
               </DialogFooter>
             </DialogContent>
