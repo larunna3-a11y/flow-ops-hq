@@ -149,14 +149,14 @@ function UsersPage() {
   const isOwner = ws?.role === "Owner";
 
   const [open, setOpen] = useState(false);
-  const [inviteFullName, setInviteFullName] = useState("");
-  const [invitePhone, setInvitePhone] = useState("");
+  const [bulkPhones, setBulkPhones] = useState("");
   const [inviteRole, setInviteRole] = useState<InviteRole>("Packer");
   const [inviteExpiration, setInviteExpiration] = useState<string>("30");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [lastBatch, setLastBatch] = useState<{ token: string; phone: string; role: AppRole }[]>([]);
 
-  const createInvite = useServerFn(createInviteFn);
+  const createBulk = useServerFn(createBulkFn);
   const revokeInvite = useServerFn(revokeInviteFn);
   const removeFn = useServerFn(removeUserFn);
 
