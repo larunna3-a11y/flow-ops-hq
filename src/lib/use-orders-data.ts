@@ -72,6 +72,16 @@ export type ImportBatch = {
   created_at: string;
 };
 
+export type DashboardStats = {
+  totalOrders: number;
+  pendingOrders: number;
+  packedOrders: number;
+  shippedOrders: number;
+  totalReturns: number;
+  activePackers: number;
+  activeUsers: number;
+};
+
 export function useStores() {
   const ws = useWorkspace();
   const wid = ws.data?.workspace?.id;
@@ -90,26 +100,120 @@ export function useStores() {
   });
 }
 
-export function useOrders(filters?: {
-  search?: string;
-  marketplace?: string;
-  store?: string;
-  status?: string;
-}) {
+/**
+ * Aggregate dashboard stats using server-side COUNT queries.
+ * Never loads full rows — safe for any dataset size.
+ * Accepts an optional date range (from/to ISO strings) to scope
+ * time-sensitive stats; totalOrders always counts all orders.
+ */
+export function useDashboardStats(range?: { from: string; to: string }) {
+  const ws = useWorkspace();
+  const wid = ws.data?.workspace?.id;
+  return useQuery({
+    queryKey: ["dashboard_stats", wid, range],
+    enabled: !!wid,
+    queryFn: async () => {
+      // Run all aggregate queries in parallel for speed
+      const [
+        totalOrdersRes,
+        pendingOrdersRes,
+        packedOrdersRes,
+        shippedOrdersRes,
+        totalReturnsRes,
+        activePackersRes,
+        activeUsersRes,
+      ] = await Promise.all([
+        // Total orders — always all orders, no date filter
+        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
+
+        // Pending = packing_status eq 'pending'
+        db
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .eq("packing_status", "pending"),
+
+        // Packed orders in range
+        (() => {
+          let q = db
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", wid)
+            .eq("packing_status", "packed");
+          if (range) q = q.gte("updated_at", range.from).lte("updated_at", range.to);
+          return q;
+        })(),
+
+        // Shipped orders in range
+        (() => {
+          let q = db
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", wid)
+            .eq("packing_status", "shipped");
+          if (range) q = q.gte("updated_at", range.from).lte("updated_at", range.to);
+          return q;
+        })(),
+
+        // Total returns in range
+        (() => {
+          let q = db.from("returns").select("id", { count: "exact", head: true }).eq("workspace_id", wid);
+          if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
+          return q;
+        })(),
+
+        // Active packers = distinct user_ids in packing_records in range
+        (() => {
+          let q = db
+            .from("packing_records")
+            .select("user_id", { count: "exact", head: false })
+            .eq("workspace_id", wid)
+            .neq("status", "Cancelled");
+          if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
+          return q;
+        })(),
+
+        // Active users = distinct actors in audit_logs today
+        (() => {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          return db
+            .from("audit_logs")
+            .select("actor_id", { count: "exact", head: false })
+            .eq("workspace_id", wid)
+            .gte("created_at", todayStart.toISOString())
+            .not("actor_id", "is", null);
+        })(),
+      ]);
+
+      // Distinct active packers (deduplicate user_ids client-side from small result)
+      const activePackers = new Set((activePackersRes.data ?? []).map((r: { user_id: string }) => r.user_id)).size;
+
+      // Distinct active users
+      const activeUsers = new Set((activeUsersRes.data ?? []).map((r: { actor_id: string }) => r.actor_id)).size;
+
+      return {
+        totalOrders: totalOrdersRes.count ?? 0,
+        pendingOrders: pendingOrdersRes.count ?? 0,
+        packedOrders: packedOrdersRes.count ?? 0,
+        shippedOrders: shippedOrdersRes.count ?? 0,
+        totalReturns: totalReturnsRes.count ?? 0,
+        activePackers,
+        activeUsers,
+      } as DashboardStats;
+    },
+  });
+}
+
+export function useOrders(filters?: { search?: string; marketplace?: string; store?: string; status?: string }) {
   const ws = useWorkspace();
   const wid = ws.data?.workspace?.id;
   return useQuery({
     queryKey: ["orders", wid, filters],
     enabled: !!wid,
     queryFn: async () => {
-      let q = db
-        .from("orders")
-        .select("*")
-        .eq("workspace_id", wid)
-        .order("created_at", { ascending: false })
-        .limit(1000);
-      if (filters?.marketplace && filters.marketplace !== "all")
-        q = q.eq("marketplace", filters.marketplace);
+      let q = db.from("orders").select("*").eq("workspace_id", wid).order("created_at", { ascending: false });
+      if (filters?.marketplace && filters.marketplace !== "all") q = q.eq("marketplace", filters.marketplace);
       if (filters?.store && filters.store !== "all") q = q.eq("store_id", filters.store);
       if (filters?.status && filters.status !== "all") q = q.eq("packing_status", filters.status);
       if (filters?.search) {
@@ -121,14 +225,8 @@ export function useOrders(filters?: {
           .eq("workspace_id", wid)
           .ilike("sku", `%${s}%`)
           .limit(500);
-        const skuOrderIds = Array.from(
-          new Set((skuMatches ?? []).map((r: { order_id: string }) => r.order_id)),
-        );
-        const orParts = [
-          `order_number.ilike.%${s}%`,
-          `tracking_number.ilike.%${s}%`,
-          `customer_name.ilike.%${s}%`,
-        ];
+        const skuOrderIds = Array.from(new Set((skuMatches ?? []).map((r: { order_id: string }) => r.order_id)));
+        const orParts = [`order_number.ilike.%${s}%`, `tracking_number.ilike.%${s}%`, `customer_name.ilike.%${s}%`];
         if (skuOrderIds.length) orParts.push(`id.in.(${skuOrderIds.join(",")})`);
         q = q.or(orParts.join(","));
       }
