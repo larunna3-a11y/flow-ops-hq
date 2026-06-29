@@ -46,7 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspace, type AppRole } from "@/lib/use-workspace";
 import {
-  createPhoneInvitation as createInviteFn,
+  createBulkPhoneInvitations as createBulkFn,
   revokeInvitation as revokeInviteFn,
   removeUser as removeUserFn,
 } from "@/lib/user-management.functions";
