@@ -224,38 +224,53 @@ function UsersPage() {
     );
   }, [members, search]);
 
+  const parsedPhones = useMemo(
+    () =>
+      bulkPhones
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [bulkPhones],
+  );
+
   const sendInvite = async () => {
     if (!workspaceId) return toast.error(t("users.toast.noWorkspace"));
     if (!isOwner) return toast.error(t("users.toast.ownerOnly"));
-    const fullName = inviteFullName.trim();
-    const phone = invitePhone.trim();
-    if (!fullName) return toast.error("Enter a full name");
-    if (!phone) return toast.error("Enter a phone number");
+    if (parsedPhones.length === 0) return toast.error("Paste at least one phone number");
 
     const accountExpiresInDays =
       inviteExpiration === "permanent" ? null : parseInt(inviteExpiration, 10);
 
     setSending(true);
     try {
-      const inv = await createInvite({
+      const res = await createBulk({
         data: {
-          fullName,
-          phone,
+          phones: parsedPhones,
           role: inviteRole,
           accountExpiresInDays,
         },
       });
-      const link = buildInviteLink(inv.token);
-      try {
-        await navigator.clipboard.writeText(link);
-        toast.success("Invitation created — link copied to clipboard");
-      } catch {
-        toast.success("Invitation created");
+      const created = res.created ?? [];
+      if (created.length === 0) {
+        toast.message("No new invitations created", {
+          description: "All phone numbers already have pending invitations.",
+        });
+      } else {
+        setLastBatch(created.map((c) => ({ token: c.token, phone: c.phone, role: c.role })));
+        const allLinks = created.map((c) => buildInviteLink(c.token)).join("\n");
+        try {
+          await navigator.clipboard.writeText(allLinks);
+          toast.success(`${created.length} invitation${created.length === 1 ? "" : "s"} created — all links copied`);
+        } catch {
+          toast.success(`${created.length} invitation${created.length === 1 ? "" : "s"} created`);
+        }
+        if (res.skipped?.length) {
+          toast.message(`${res.skipped.length} already had a pending invitation`, {
+            description: res.skipped.join(", "),
+          });
+        }
       }
-      setInviteFullName("");
-      setInvitePhone("");
-      setInviteRole("Packer");
-      setInviteExpiration("30");
+      setBulkPhones("");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
     } catch (e) {
