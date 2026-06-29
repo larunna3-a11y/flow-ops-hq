@@ -21,35 +21,16 @@ import { StatusPill, statusToTone } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
 import { usePackingRecords } from "@/lib/use-warehouse-data";
 import { logActivity } from "@/lib/activity.functions";
 import { notify } from "@/lib/notify";
 import { detect, type DetectionResult } from "@/lib/detection";
-import { MARKETPLACES, COURIERS } from "@/lib/use-orders-data";
+import { MARKETPLACES, COURIERS, useOrders } from "@/lib/use-orders-data";
 
 export const Route = createFileRoute("/_app/packing")({
   head: () => ({
@@ -71,7 +52,6 @@ type OrderItem = {
   quantity: number;
   warehouse_location: string | null;
 };
-
 
 type LookupOrder = {
   id: string;
@@ -134,19 +114,21 @@ function PackingPage() {
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
+  const ordersQuery = useOrders();
 
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
+    const orders = ordersQuery.data ?? [];
     return {
-      inQueue: records.filter((r) => r.status === "Pending").length,
+      inQueue: orders.filter((o) => o.packing_status === "pending").length,
       activePackers: new Set(todayRecords.map((r) => r.user_id)).size,
       packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
       shipped: records.filter((r) => r.status === "Shipped").length,
     };
-  }, [records]);
+  }, [records, ordersQuery.data]);
 
   async function lookup(code: string, scanType: "keyboard" | "camera") {
     const value = code.trim();
@@ -174,9 +156,7 @@ function PackingPage() {
     if (detection.trackingNumber && !tryNumbers.includes(detection.trackingNumber))
       tryNumbers.push(detection.trackingNumber);
 
-    const orClauses = tryNumbers
-      .flatMap((n) => [`order_number.eq.${n}`, `tracking_number.eq.${n}`])
-      .join(",");
+    const orClauses = tryNumbers.flatMap((n) => [`order_number.eq.${n}`, `tracking_number.eq.${n}`]).join(",");
 
     const { data: orderRow } = await supabase
       .from("orders")
@@ -206,14 +186,12 @@ function PackingPage() {
           quantity: (it.quantity as number) ?? 0,
           warehouse_location: (it.warehouse_location as string | null) ?? null,
         })),
-
       };
     }
 
     const orList = [`raw_code.eq.${value}`];
     const trackingForDup = order?.tracking_number ?? detection.trackingNumber;
-    if (trackingForDup && trackingForDup !== value)
-      orList.push(`tracking_number.eq.${trackingForDup}`);
+    if (trackingForDup && trackingForDup !== value) orList.push(`tracking_number.eq.${trackingForDup}`);
     const { data: dups } = await supabase
       .from("packing_records")
       .select("id, created_at, user_name")
@@ -258,9 +236,7 @@ function PackingPage() {
   }
 
   const allVerified =
-    !!scan.order &&
-    scan.order.items.length > 0 &&
-    scan.order.items.every((i) => scan.verifiedItems[i.id]);
+    !!scan.order && scan.order.items.length > 0 && scan.order.items.every((i) => scan.verifiedItems[i.id]);
 
   function setMissingQty(id: string, qty: number) {
     setScan((s) => ({ ...s, missingQty: { ...s.missingQty, [id]: Math.max(0, qty) } }));
@@ -277,11 +253,7 @@ function PackingPage() {
     }
     setSubmitting(true);
     try {
-      const me = await supabase
-        .from("profiles")
-        .select("full_name, email")
-        .eq("id", userId)
-        .maybeSingle();
+      const me = await supabase.from("profiles").select("full_name, email").eq("id", userId).maybeSingle();
       const userName = me.data?.full_name || me.data?.email || "Operator";
       const nowIso = new Date().toISOString();
       const device = detectDevice();
@@ -299,9 +271,7 @@ function PackingPage() {
       const missingSkus = order.items
         .filter((i) => !scan.verifiedItems[i.id] || (scan.missingQty[i.id] ?? 0) > 0)
         .map((i) => {
-          const missing = scan.verifiedItems[i.id]
-            ? Math.min(scan.missingQty[i.id] ?? 0, i.quantity)
-            : i.quantity;
+          const missing = scan.verifiedItems[i.id] ? Math.min(scan.missingQty[i.id] ?? 0, i.quantity) : i.quantity;
           return {
             item_id: i.id,
             sku_marketplace: i.sku_marketplace ?? i.sku ?? null,
@@ -396,6 +366,7 @@ function PackingPage() {
       );
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
       qc.invalidateQueries({ queryKey: ["audit_logs"] });
@@ -431,8 +402,16 @@ function PackingPage() {
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label={t("packing.kpis.inQueue")} value={String(kpis.inQueue)} icon={<PackageCheck className="h-4 w-4" />} />
-        <StatCard label={t("packing.kpis.activePackers")} value={String(kpis.activePackers)} icon={<QrCode className="h-4 w-4" />} />
+        <StatCard
+          label={t("packing.kpis.inQueue")}
+          value={String(kpis.inQueue)}
+          icon={<PackageCheck className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("packing.kpis.activePackers")}
+          value={String(kpis.activePackers)}
+          icon={<QrCode className="h-4 w-4" />}
+        />
         <StatCard label="Packed today" value={String(kpis.packedToday)} icon={<CheckCircle2 className="h-4 w-4" />} />
         <StatCard label="Shipped" value={String(kpis.shipped)} />
       </div>
@@ -530,10 +509,16 @@ function PackingPage() {
                   setScan((s) => ({ ...s, override: { ...s.override, marketplace: v === "_none" ? null : v } }))
                 }
               >
-                <SelectTrigger className="h-8 mt-1"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectTrigger className="h-8 mt-1">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none">—</SelectItem>
-                  {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {MARKETPLACES.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -545,10 +530,16 @@ function PackingPage() {
                   setScan((s) => ({ ...s, override: { ...s.override, courier: v === "_none" ? null : v } }))
                 }
               >
-                <SelectTrigger className="h-8 mt-1"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectTrigger className="h-8 mt-1">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none">—</SelectItem>
-                  {COURIERS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {COURIERS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -578,14 +569,8 @@ function PackingPage() {
               <TableBody>
                 {scan.order.items.map((it) => {
                   const verified = !!scan.verifiedItems[it.id];
-                  const missing = verified
-                    ? Math.min(scan.missingQty[it.id] ?? 0, it.quantity)
-                    : it.quantity;
-                  const rowTone = !verified
-                    ? "bg-warning/5"
-                    : missing > 0
-                      ? "bg-warning/5"
-                      : "bg-success/5";
+                  const missing = verified ? Math.min(scan.missingQty[it.id] ?? 0, it.quantity) : it.quantity;
+                  const rowTone = !verified ? "bg-warning/5" : missing > 0 ? "bg-warning/5" : "bg-success/5";
                   return (
                     <TableRow key={it.id} className={rowTone}>
                       <TableCell>
@@ -597,7 +582,9 @@ function PackingPage() {
                         />
                       </TableCell>
                       <TableCell className="font-mono text-xs">{it.sku_marketplace ?? it.sku ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{it.sku_master ?? it.sku ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {it.sku_master ?? it.sku ?? "—"}
+                      </TableCell>
                       <TableCell>{it.product_name}</TableCell>
                       <TableCell className="text-muted-foreground">{it.product_variant ?? "—"}</TableCell>
                       <TableCell className="text-right">{it.quantity}</TableCell>
@@ -636,16 +623,9 @@ function PackingPage() {
             <Button variant="outline" onClick={verifyAll} type="button" disabled={!scan.order.items.length}>
               <CheckCircle2 className="h-4 w-4" /> Verify all
             </Button>
-            <Button
-              onClick={confirmPacking}
-              disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate)}
-            >
+            <Button onClick={confirmPacking} disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate)}>
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {scan.duplicate
-                ? "Override & confirm"
-                : allVerified
-                  ? "Confirm packing"
-                  : "Confirm with missing items"}
+              {scan.duplicate ? "Override & confirm" : allVerified ? "Confirm packing" : "Confirm with missing items"}
             </Button>
           </div>
         </div>
@@ -783,11 +763,7 @@ function CameraScanDialog({
         <DialogHeader>
           <DialogTitle>Camera scanner</DialogTitle>
         </DialogHeader>
-        {error && (
-          <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">{error}</div>}
         {supported && (
           <div className="overflow-hidden rounded-md border bg-black aspect-video">
             <video ref={videoRef} className="h-full w-full object-cover" muted playsInline />

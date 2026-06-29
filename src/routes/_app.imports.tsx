@@ -31,10 +31,7 @@ function ImportsPage() {
 
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [preview, setPreview] = useState<
-    | (DestyParseResult & { filename: string; parsedAt: string })
-    | null
-  >(null);
+  const [preview, setPreview] = useState<(DestyParseResult & { filename: string; parsedAt: string }) | null>(null);
 
   async function onFileChosen(file: File) {
     setParsing(true);
@@ -71,9 +68,7 @@ function ImportsPage() {
         .select("order_number")
         .eq("workspace_id", wid)
         .in("order_number", orderNumbers);
-      const existingSet = new Set(
-        (existing ?? []).map((r: { order_number: string }) => r.order_number),
-      );
+      const existingSet = new Set((existing ?? []).map((r: { order_number: string }) => r.order_number));
 
       const toInsert = preview.orders.filter((o) => {
         if (existingSet.has(o.order_number)) {
@@ -97,13 +92,10 @@ function ImportsPage() {
           courier: o.courier,
           ordered_at: o.ordered_at,
           order_status: "new",
-          packing_status: "new",
+          packing_status: "pending",
           shipping_status: "pending",
         }));
-        const { data: inserted, error } = await db
-          .from("orders")
-          .insert(orderRows)
-          .select("id, order_number");
+        const { data: inserted, error } = await db.from("orders").insert(orderRows).select("id, order_number");
         if (error) {
           failed += slice.length;
           continue;
@@ -127,7 +119,6 @@ function ImportsPage() {
               quantity: it.quantity,
             });
           }
-
         }
         if (itemRows.length) {
           const { error: itemErr } = await db.from("order_items").insert(itemRows);
@@ -158,6 +149,7 @@ function ImportsPage() {
       qc.invalidateQueries({ queryKey: ["order_items"] });
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["packing"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Import failed.");
@@ -193,15 +185,17 @@ function ImportsPage() {
               if (f) onFileChosen(f);
             }}
           />
-          <Button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={parsing || importing}
-          >
+          <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={parsing || importing}>
             {parsing ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Reading file…</>
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Reading file…
+              </>
             ) : (
-              <><Upload className="h-4 w-4 mr-2" />Choose file</>
+              <>
+                <Upload className="h-4 w-4 mr-2" />
+                Choose file
+              </>
             )}
           </Button>
         </div>
@@ -224,7 +218,10 @@ function ImportsPage() {
               </Button>
               <Button onClick={confirmImport} disabled={importing}>
                 {importing ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Importing…</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Importing…
+                  </>
                 ) : (
                   `Import ${preview.orders.length} orders`
                 )}
@@ -235,11 +232,7 @@ function ImportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Stat label="Total Orders" value={preview.orders.length} />
             <Stat label="Total Order Items" value={preview.totalItems} />
-            <Stat
-              label="Import Date"
-              value={new Date(preview.parsedAt).toLocaleString()}
-              mono
-            />
+            <Stat label="Import Date" value={new Date(preview.parsedAt).toLocaleString()} mono />
           </div>
 
           <div className="rounded-md border overflow-hidden">
@@ -305,7 +298,9 @@ function ImportsPage() {
                   <TableCell className="text-right text-success">{i.success_count}</TableCell>
                   <TableCell className="text-right text-destructive">{i.failed_count}</TableCell>
                   <TableCell className="text-right">{i.duplicate_count}</TableCell>
-                  <TableCell><StatusPill tone={statusToTone(i.status)}>{i.status}</StatusPill></TableCell>
+                  <TableCell>
+                    <StatusPill tone={statusToTone(i.status)}>{i.status}</StatusPill>
+                  </TableCell>
                 </TableRow>
               ))}
               {!(imports.data ?? []).length && (
