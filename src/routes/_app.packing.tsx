@@ -10,6 +10,8 @@ import {
   RefreshCw,
   X,
   PackageCheck,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,6 +24,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,6 +90,8 @@ type ScanState = {
   override: { marketplace: string | null; courier: string | null };
   verifiedItems: Record<string, boolean>;
   missingQty: Record<string, number>;
+  /** If set, we're editing an existing packing_record instead of creating a new one */
+  editingRecordId: string | null;
 };
 
 const INITIAL_STATE: ScanState = {
@@ -91,6 +105,7 @@ const INITIAL_STATE: ScanState = {
   override: { marketplace: null, courier: null },
   verifiedItems: {},
   missingQty: {},
+  editingRecordId: null,
 };
 
 function detectDevice() {
@@ -109,21 +124,37 @@ function PackingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; orderNumber: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const role = ws.data?.role ?? null;
   const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
+  const canDelete = role === "Owner" || role === "Supervisor";
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
   const ordersQuery = useOrders();
 
+  // ── KPIs ──────────────────────────────────────────────────────────────────
+  // "In Queue" = orders with packing_status === "pending"
+  // "Total Orders" = all orders (used as base — decreases as orders get packed/done)
+  // "Packed today" = packing records created today that are not Pending/Cancelled
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
     const orders = ordersQuery.data ?? [];
+
+    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
+    const totalOrders = orders.length;
+    // Remaining = orders not yet packed or beyond (still pending)
+    const remaining = inQueue; // alias for clarity in display
     return {
-      inQueue: orders.filter((o) => o.packing_status === "pending").length,
+      totalOrders,
+      inQueue,
+      remaining,
       activePackers: new Set(todayRecords.map((r) => r.user_id)).size,
       packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
       shipped: records.filter((r) => r.status === "Shipped").length,
@@ -150,7 +181,6 @@ function PackingPage() {
     }
 
     let order: LookupOrder | null = null;
-    // Always try a direct order/tracking lookup against the value first
     const tryNumbers = [value];
     if (detection.orderNumber && detection.orderNumber !== value) tryNumbers.push(detection.orderNumber);
     if (detection.trackingNumber && !tryNumbers.includes(detection.trackingNumber))
@@ -216,7 +246,102 @@ function PackingPage() {
       },
       verifiedItems: {},
       missingQty: {},
+      editingRecordId: null,
     });
+  }
+
+  /** Load an existing packing_record back into the scan form for re-editing */
+  async function startEdit(recordId: string) {
+    const workspace = ws.data?.workspace;
+    if (!workspace) return;
+
+    setScan({ ...INITIAL_STATE, loading: true });
+
+    // Fetch the packing record
+    const { data: rec, error: recErr } = await supabase
+      .from("packing_records")
+      .select("*")
+      .eq("id", recordId)
+      .maybeSingle();
+
+    if (recErr || !rec) {
+      toast.error("Could not load packing record for editing.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
+    // Fetch the associated order
+    const orderCode = rec.order_number ?? rec.tracking_number ?? rec.raw_code;
+    if (!orderCode) {
+      toast.error("No order reference found on this record.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
+    const orClauses = [`order_number.eq.${orderCode}`, `tracking_number.eq.${orderCode}`].join(",");
+    const { data: orderRow } = await supabase
+      .from("orders")
+      .select(
+        "id, order_number, tracking_number, marketplace, store_name, courier, customer_name, customer_phone, packing_status, order_status",
+      )
+      .eq("workspace_id", workspace.id)
+      .or(orClauses)
+      .limit(1)
+      .maybeSingle();
+
+    let order: LookupOrder | null = null;
+    if (orderRow) {
+      const { data: items } = await supabase
+        .from("order_items")
+        .select("*")
+        .eq("order_id", orderRow.id)
+        .order("created_at", { ascending: true });
+      order = {
+        ...orderRow,
+        items: (items ?? []).map((it: Record<string, unknown>) => ({
+          id: it.id as string,
+          sku: (it.sku as string) ?? "",
+          sku_marketplace: (it.sku_marketplace as string | null) ?? null,
+          sku_master: (it.sku_master as string | null) ?? null,
+          product_name: (it.product_name as string) ?? "",
+          product_variant: (it.product_variant as string | null) ?? null,
+          quantity: (it.quantity as number) ?? 0,
+          warehouse_location: (it.warehouse_location as string | null) ?? null,
+        })),
+      };
+    }
+
+    // Restore verified items from the saved record
+    const savedVerified: Record<string, boolean> = {};
+    const savedMissing: Record<string, number> = {};
+    const verifiedSkus: Array<{ item_id: string }> = (rec.verified_skus as Array<{ item_id: string }>) ?? [];
+    const missingSkus: Array<{ item_id: string; missing_quantity: number }> =
+      (rec.missing_skus as Array<{ item_id: string; missing_quantity: number }>) ?? [];
+
+    for (const vs of verifiedSkus) savedVerified[vs.item_id] = true;
+    for (const ms of missingSkus) savedMissing[ms.item_id] = ms.missing_quantity;
+
+    toast.info(`Editing packing record for ${rec.order_number ?? orderCode}`);
+
+    setScan({
+      code: rec.raw_code ?? orderCode,
+      scanType: "keyboard",
+      order,
+      duplicate: null, // editing = we own this record
+      notFound: !order,
+      loading: false,
+      detection: null,
+      override: {
+        marketplace: rec.marketplace ?? order?.marketplace ?? null,
+        courier: rec.courier ?? order?.courier ?? null,
+      },
+      verifiedItems: savedVerified,
+      missingQty: savedMissing,
+      editingRecordId: recordId,
+    });
+
+    // Scroll to the verification panel
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 100);
   }
 
   function resetScan() {
@@ -247,7 +372,7 @@ function PackingPage() {
     const workspace = ws.data?.workspace;
     const userId = ws.data?.userId;
     if (!order || !workspace || !userId) return;
-    if (scan.duplicate && !canOverrideDuplicate) {
+    if (scan.duplicate && !canOverrideDuplicate && !scan.editingRecordId) {
       toast.error("Duplicate — only Owner or Supervisor can confirm.");
       return;
     }
@@ -285,47 +410,79 @@ function PackingPage() {
       const completionStatus = totalMissing > 0 ? "Packed with Missing Items" : "Complete";
       const packingStatusValue = totalMissing > 0 ? "Packed with Missing Items" : "Packed";
 
-      const { data: inserted, error } = await supabase
-        .from("packing_records")
-        .insert({
-          workspace_id: workspace.id,
-          user_id: userId,
-          user_name: userName,
-          role,
-          scan_timestamp: nowIso,
-          packing_timestamp: nowIso,
-          raw_code: scan.duplicate ? `${scan.code}#${Date.now()}` : scan.code,
-          order_number: order.order_number,
-          tracking_number: order.tracking_number,
-          marketplace: finalMarketplace,
-          courier: finalCourier,
-          status: packingStatusValue,
-          verified_skus: verifiedSkus,
-          missing_skus: missingSkus,
-          missing_quantity: totalMissing,
-          completion_status: completionStatus,
-        })
-        .select("id, order_number")
-        .single();
+      const recordPayload = {
+        workspace_id: workspace.id,
+        user_id: userId,
+        user_name: userName,
+        role,
+        scan_timestamp: nowIso,
+        packing_timestamp: nowIso,
+        raw_code: scan.editingRecordId
+          ? scan.code // keep original raw_code on edit
+          : scan.duplicate
+            ? `${scan.code}#${Date.now()}`
+            : scan.code,
+        order_number: order.order_number,
+        tracking_number: order.tracking_number,
+        marketplace: finalMarketplace,
+        courier: finalCourier,
+        status: packingStatusValue,
+        verified_skus: verifiedSkus,
+        missing_skus: missingSkus,
+        missing_quantity: totalMissing,
+        completion_status: completionStatus,
+      };
 
-      if (error) {
-        if (error.code === "23505") {
-          toast.warning("Duplicate barcode or tracking number");
-          notify({
-            type: "scan.duplicate",
-            title: "Duplicate scan blocked",
-            body: `${order.order_number} — tracking ${order.tracking_number ?? "—"} was already scanned.`,
-            severity: "warning",
-            link: "/packing",
-            roles: ["Supervisor", "Owner"],
-            metadata: { order_number: order.order_number, tracking_number: order.tracking_number },
-          });
-        } else {
+      let insertedId: string;
+
+      if (scan.editingRecordId) {
+        // ── UPDATE existing record ──────────────────────────────────────────
+        const { error } = await supabase.from("packing_records").update(recordPayload).eq("id", scan.editingRecordId);
+
+        if (error) {
           toast.error(error.message);
+          return;
         }
-        return;
+        insertedId = scan.editingRecordId;
+        toast.success(
+          totalMissing > 0
+            ? `Updated ${order.order_number} — ${totalMissing} missing item${totalMissing === 1 ? "" : "s"}`
+            : `Updated packing record for ${order.order_number}`,
+        );
+      } else {
+        // ── INSERT new record ───────────────────────────────────────────────
+        const { data: inserted, error } = await supabase
+          .from("packing_records")
+          .insert(recordPayload)
+          .select("id, order_number")
+          .single();
+
+        if (error) {
+          if (error.code === "23505") {
+            toast.warning("Duplicate barcode or tracking number");
+            notify({
+              type: "scan.duplicate",
+              title: "Duplicate scan blocked",
+              body: `${order.order_number} — tracking ${order.tracking_number ?? "—"} was already scanned.`,
+              severity: "warning",
+              link: "/packing",
+              roles: ["Supervisor", "Owner"],
+              metadata: { order_number: order.order_number, tracking_number: order.tracking_number },
+            });
+          } else {
+            toast.error(error.message);
+          }
+          return;
+        }
+        insertedId = inserted.id;
+        toast.success(
+          totalMissing > 0
+            ? `Packed ${order.order_number} with ${totalMissing} missing item${totalMissing === 1 ? "" : "s"}`
+            : `Packed ${order.order_number}`,
+        );
       }
 
+      // Update the order row to reflect the new packing status
       await supabase
         .from("orders")
         .update({
@@ -340,9 +497,9 @@ function PackingPage() {
 
       await log({
         data: {
-          action: "packing.confirmed",
+          action: scan.editingRecordId ? "packing.updated" : "packing.confirmed",
           target_type: "packing_record",
-          target_id: inserted.id,
+          target_id: insertedId,
           metadata: {
             order_id: order.id,
             order_number: order.order_number,
@@ -355,15 +512,11 @@ function PackingPage() {
             completion_status: completionStatus,
             missing_quantity: totalMissing,
             missing_skus_count: missingSkus.length,
+            edited: !!scan.editingRecordId,
           },
         },
       }).catch(() => undefined);
 
-      toast.success(
-        totalMissing > 0
-          ? `Packed ${order.order_number} with ${totalMissing} missing item${totalMissing === 1 ? "" : "s"}`
-          : `Packed ${order.order_number}`,
-      );
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
@@ -373,6 +526,30 @@ function PackingPage() {
       resetScan();
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function deleteRecord(id: string) {
+    if (!canDelete) return;
+    const workspace = ws.data?.workspace;
+    if (!workspace) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("packing_records").delete().eq("id", id).eq("workspace_id", workspace.id);
+
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.success("Packing record deleted.");
+      qc.invalidateQueries({ queryKey: ["packing_records"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   }
 
@@ -401,7 +578,9 @@ function PackingPage() {
         }
       />
 
+      {/* ── KPI cards ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total Orders" value={String(kpis.totalOrders)} icon={<PackageCheck className="h-4 w-4" />} />
         <StatCard
           label={t("packing.kpis.inQueue")}
           value={String(kpis.inQueue)}
@@ -413,36 +592,38 @@ function PackingPage() {
           icon={<QrCode className="h-4 w-4" />}
         />
         <StatCard label="Packed today" value={String(kpis.packedToday)} icon={<CheckCircle2 className="h-4 w-4" />} />
-        <StatCard label="Shipped" value={String(kpis.shipped)} />
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          <div className="space-y-1.5">
-            <Label htmlFor="raw_code">Scan barcode / QR / tracking number</Label>
-            <Input
-              id="raw_code"
-              ref={codeRef}
-              value={scan.code}
-              onChange={(e) => setScan((s) => ({ ...s, code: e.target.value }))}
-              placeholder="Scan with USB scanner, type, or search…"
-              autoFocus
-              autoComplete="off"
-            />
+      {/* ── Scan input ─────────────────────────────────────────────────────── */}
+      {!scan.editingRecordId && (
+        <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <div className="space-y-1.5">
+              <Label htmlFor="raw_code">Scan barcode / QR / tracking number</Label>
+              <Input
+                id="raw_code"
+                ref={codeRef}
+                value={scan.code}
+                onChange={(e) => setScan((s) => ({ ...s, code: e.target.value }))}
+                placeholder="Scan with USB scanner, type, or search…"
+                autoFocus
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit" disabled={scan.loading || !scan.code.trim()}>
+                {scan.loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Lookup
+              </Button>
+            </div>
+            <div className="flex items-end">
+              <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
+                <Camera className="h-4 w-4" /> Use camera
+              </Button>
+            </div>
           </div>
-          <div className="flex items-end">
-            <Button type="submit" disabled={scan.loading || !scan.code.trim()}>
-              {scan.loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Lookup
-            </Button>
-          </div>
-          <div className="flex items-end">
-            <Button type="button" variant="outline" onClick={() => setCameraOpen(true)}>
-              <Camera className="h-4 w-4" /> Use camera
-            </Button>
-          </div>
-        </div>
-      </form>
+        </form>
+      )}
 
       {scan.notFound && (
         <div className="rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm">
@@ -461,15 +642,23 @@ function PackingPage() {
         </div>
       )}
 
+      {/* ── Verification panel ─────────────────────────────────────────────── */}
       {scan.order && (
         <div className="rounded-lg border bg-card shadow-card">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="flex items-center gap-3">
-              <h3 className="text-sm font-semibold">Packing verification</h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-sm font-semibold">
+                {scan.editingRecordId ? "Re-editing packing submission" : "Packing verification"}
+              </h3>
+              {scan.editingRecordId && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600">
+                  <Pencil className="h-3 w-3" /> Editing existing record
+                </span>
+              )}
               <StatusPill tone={statusToTone(scan.order.packing_status.toLowerCase())}>
                 {scan.order.packing_status}
               </StatusPill>
-              {scan.duplicate && (
+              {scan.duplicate && !scan.editingRecordId && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
                   <AlertTriangle className="h-3 w-3" /> Already packed{" "}
                   {new Date(scan.duplicate.created_at).toLocaleString()} by {scan.duplicate.user_name}
@@ -477,7 +666,7 @@ function PackingPage() {
               )}
             </div>
             <span className="text-xs text-muted-foreground">
-              {scan.scanType === "camera" ? "Camera scan" : "Keyboard scan"}
+              {scan.editingRecordId ? "Edit mode" : scan.scanType === "camera" ? "Camera scan" : "Keyboard scan"}
             </span>
           </div>
 
@@ -623,14 +812,24 @@ function PackingPage() {
             <Button variant="outline" onClick={verifyAll} type="button" disabled={!scan.order.items.length}>
               <CheckCircle2 className="h-4 w-4" /> Verify all
             </Button>
-            <Button onClick={confirmPacking} disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate)}>
+            <Button
+              onClick={confirmPacking}
+              disabled={submitting || (!!scan.duplicate && !canOverrideDuplicate && !scan.editingRecordId)}
+            >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {scan.duplicate ? "Override & confirm" : allVerified ? "Confirm packing" : "Confirm with missing items"}
+              {scan.editingRecordId
+                ? "Save changes"
+                : scan.duplicate
+                  ? "Override & confirm"
+                  : allVerified
+                    ? "Confirm packing"
+                    : "Confirm with missing items"}
             </Button>
           </div>
         </div>
       )}
 
+      {/* ── Scan history ───────────────────────────────────────────────────── */}
       <div className="rounded-lg border bg-card shadow-card">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h3 className="text-sm font-semibold">Scan history</h3>
@@ -649,6 +848,7 @@ function PackingPage() {
                 <TableHead>Courier</TableHead>
                 <TableHead>Packer</TableHead>
                 <TableHead className="text-right">Status</TableHead>
+                {(canOverrideDuplicate || canDelete) && <TableHead className="text-right w-24">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -665,11 +865,38 @@ function PackingPage() {
                   <TableCell className="text-right">
                     <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
                   </TableCell>
+                  {(canOverrideDuplicate || canDelete) && (
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Any packer can re-edit their own record; Owner/Supervisor can edit any */}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          title="Re-edit this submission"
+                          onClick={() => startEdit(r.id)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        {canDelete && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            title="Delete this record"
+                            onClick={() => setDeleteTarget({ id: r.id, orderNumber: r.order_number ?? r.id })}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {!records.length && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">
                     No scans yet. Use the form above to record your first scan.
                   </TableCell>
                 </TableRow>
@@ -679,6 +906,7 @@ function PackingPage() {
         </div>
       </div>
 
+      {/* ── Camera scanner dialog ──────────────────────────────────────────── */}
       <CameraScanDialog
         open={cameraOpen}
         onOpenChange={setCameraOpen}
@@ -687,6 +915,36 @@ function PackingPage() {
           lookup(value, "camera");
         }}
       />
+
+      {/* ── Delete confirmation dialog ────────────────────────────────────── */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete packing record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the packing record for order{" "}
+              <span className="font-mono font-semibold">{deleteTarget?.orderNumber}</span>. The order's packing status
+              will not be automatically reverted — you may need to re-pack it. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteRecord(deleteTarget.id)}
+            >
+              {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Delete record
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
