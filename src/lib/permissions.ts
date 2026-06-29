@@ -27,8 +27,11 @@ const ALL: ModuleKey[] = [
 
 const ROLE_MODULES: Record<AppRole, ModuleKey[]> = {
   Owner: ALL,
-  Supervisor: ["dashboard", "orders", "packing", "scanning", "returns", "reports", "imports", "stores", "detection-rules", "integrations", "operations", "automation", "system"],
-  Packer: ["packing", "scanning"],
+  // Supervisor: Dashboard, Packing, Returns, Reports only.
+  Supervisor: ["dashboard", "packing", "returns", "reports"],
+  // Packer: Packing only.
+  Packer: ["packing"],
+  // Return Staff: Returns only.
   "Return Staff": ["returns"],
 };
 

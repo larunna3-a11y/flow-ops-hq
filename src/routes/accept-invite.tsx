@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
-import { getInvitationByToken } from "@/lib/user-management.functions";
+import {
+  acceptInvitation,
+  getInvitationByToken,
+} from "@/lib/user-management.functions";
+import { HOME_PATH } from "@/lib/permissions";
 
 type InviteInfo = Awaited<ReturnType<typeof getInvitationByToken>>;
 
@@ -22,13 +26,17 @@ function AcceptInvitePage() {
   const [info, setInfo] = useState<InviteInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [fullName, setFullName] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await getInvitationByToken({ data: { token } });
-        if (!cancelled) setInfo(res);
+        if (!cancelled) {
+          setInfo(res);
+          if (res?.full_name) setFullName(res.full_name);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -41,33 +49,30 @@ function AcceptInvitePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!info) return;
-    const form = e.currentTarget as HTMLFormElement;
-    const fd = new FormData(form);
-    const email = String(fd.get("email") || "").trim();
-    const password = String(fd.get("password") || "");
-    if (!email || password.length < 8) {
-      toast.error("Enter your email and a password (min 8 characters)");
+    const name = fullName.trim();
+    if (name.length < 2) {
+      toast.error("Please enter your full name");
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/dashboard`,
-        data: {
-          full_name: info.full_name,
-          invitation_token: token,
-        },
-      },
-    });
-    setSubmitting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      // Make sure no stale session is attached when we sign the invitee in.
+      await supabase.auth.signOut().catch(() => undefined);
+
+      const creds = await acceptInvitation({ data: { token, fullName: name } });
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password,
+      });
+      if (signInErr) throw signInErr;
+
+      toast.success(`Welcome to ${info.workspace_name}!`);
+      navigate({ to: HOME_PATH[creds.role] ?? "/dashboard", replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not accept invitation");
+    } finally {
+      setSubmitting(false);
     }
-    toast.success(`Welcome to ${info.workspace_name}!`);
-    navigate({ to: "/dashboard" });
   };
 
   const isExpired =
@@ -97,17 +102,24 @@ function AcceptInvitePage() {
           </div>
         ) : isExpired ? (
           <div className="space-y-2">
-            <h1 className="text-xl font-semibold">Invitation expired</h1>
+            <h1 className="text-xl font-semibold">
+              {info.status === "accepted"
+                ? "Invitation already used"
+                : info.status === "revoked"
+                  ? "Invitation revoked"
+                  : "Invitation expired"}
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Hi {info.full_name}, this invitation to {info.workspace_name} is no longer valid.
-              Ask the Owner to send a new link.
+              This invitation to {info.workspace_name} is no longer valid. Ask the Owner to
+              send a new link.
             </p>
           </div>
         ) : (
           <>
             <h1 className="text-xl font-semibold">You're invited to {info.workspace_name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {info.full_name} · {info.role} · phone {info.phone}
+              Role: <span className="font-medium text-foreground">{info.role}</span>
+              {info.phone ? <> · {info.phone}</> : null}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Link expires {new Date(info.expires_at).toLocaleDateString()}
@@ -115,16 +127,24 @@ function AcceptInvitePage() {
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="email">Your email</Label>
-                <Input id="email" name="email" type="email" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Create a password</Label>
-                <Input id="password" name="password" type="password" minLength={8} required />
+                <Label htmlFor="full-name">Your full name</Label>
+                <Input
+                  id="full-name"
+                  name="full-name"
+                  autoFocus
+                  required
+                  minLength={2}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Aulia Rahman"
+                />
               </div>
               <Button type="submit" className="w-full" disabled={submitting}>
-                {submitting ? "Creating account…" : "Accept invitation"}
+                {submitting ? "Joining workspace…" : "Accept invitation & continue"}
               </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                No password required. You'll be signed in automatically.
+              </p>
             </form>
           </>
         )}

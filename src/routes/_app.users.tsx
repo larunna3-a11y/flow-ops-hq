@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { UserPlus, MoreHorizontal, Mail, Copy, MessageCircle, Link as LinkIcon } from "lucide-react";
+import { UserPlus, MoreHorizontal, Mail, Copy, MessageCircle, Link as LinkIcon, Download, Files } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -45,7 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useWorkspace, type AppRole } from "@/lib/use-workspace";
 import {
-  createPhoneInvitation as createInviteFn,
+  createBulkPhoneInvitations as createBulkFn,
   revokeInvitation as revokeInviteFn,
   removeUser as removeUserFn,
 } from "@/lib/user-management.functions";
@@ -148,14 +149,14 @@ function UsersPage() {
   const isOwner = ws?.role === "Owner";
 
   const [open, setOpen] = useState(false);
-  const [inviteFullName, setInviteFullName] = useState("");
-  const [invitePhone, setInvitePhone] = useState("");
+  const [bulkPhones, setBulkPhones] = useState("");
   const [inviteRole, setInviteRole] = useState<InviteRole>("Packer");
   const [inviteExpiration, setInviteExpiration] = useState<string>("30");
   const [sending, setSending] = useState(false);
   const [search, setSearch] = useState("");
+  const [lastBatch, setLastBatch] = useState<{ token: string; phone: string; role: AppRole }[]>([]);
 
-  const createInvite = useServerFn(createInviteFn);
+  const createBulk = useServerFn(createBulkFn);
   const revokeInvite = useServerFn(revokeInviteFn);
   const removeFn = useServerFn(removeUserFn);
 
@@ -223,38 +224,53 @@ function UsersPage() {
     );
   }, [members, search]);
 
+  const parsedPhones = useMemo(
+    () =>
+      bulkPhones
+        .split(/[\n,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [bulkPhones],
+  );
+
   const sendInvite = async () => {
     if (!workspaceId) return toast.error(t("users.toast.noWorkspace"));
     if (!isOwner) return toast.error(t("users.toast.ownerOnly"));
-    const fullName = inviteFullName.trim();
-    const phone = invitePhone.trim();
-    if (!fullName) return toast.error("Enter a full name");
-    if (!phone) return toast.error("Enter a phone number");
+    if (parsedPhones.length === 0) return toast.error("Paste at least one phone number");
 
     const accountExpiresInDays =
       inviteExpiration === "permanent" ? null : parseInt(inviteExpiration, 10);
 
     setSending(true);
     try {
-      const inv = await createInvite({
+      const res = await createBulk({
         data: {
-          fullName,
-          phone,
+          phones: parsedPhones,
           role: inviteRole,
           accountExpiresInDays,
         },
       });
-      const link = buildInviteLink(inv.token);
-      try {
-        await navigator.clipboard.writeText(link);
-        toast.success("Invitation created — link copied to clipboard");
-      } catch {
-        toast.success("Invitation created");
+      const created = res.created ?? [];
+      if (created.length === 0) {
+        toast.message("No new invitations created", {
+          description: "All phone numbers already have pending invitations.",
+        });
+      } else {
+        setLastBatch(created.map((c) => ({ token: c.token, phone: c.phone, role: c.role })));
+        const allLinks = created.map((c) => buildInviteLink(c.token)).join("\n");
+        try {
+          await navigator.clipboard.writeText(allLinks);
+          toast.success(`${created.length} invitation${created.length === 1 ? "" : "s"} created — all links copied`);
+        } catch {
+          toast.success(`${created.length} invitation${created.length === 1 ? "" : "s"} created`);
+        }
+        if (res.skipped?.length) {
+          toast.message(`${res.skipped.length} already had a pending invitation`, {
+            description: res.skipped.join(", "),
+          });
+        }
       }
-      setInviteFullName("");
-      setInvitePhone("");
-      setInviteRole("Packer");
-      setInviteExpiration("30");
+      setBulkPhones("");
       setOpen(false);
       qc.invalidateQueries({ queryKey: ["invitations", workspaceId] });
     } catch (e) {
@@ -347,31 +363,28 @@ function UsersPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Invite a new user</DialogTitle>
+                <DialogTitle>Invite team members</DialogTitle>
                 <DialogDescription>
-                  Enter the team member's name and phone number. We'll generate a secure
-                  invitation link you can copy or send via WhatsApp.
+                  Paste one or many phone numbers (one per line). We'll generate a secure,
+                  single-use invitation link for each — invitees only need to enter their full
+                  name to join.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="invite-name">Full Name</Label>
-                  <Input
-                    id="invite-name"
-                    placeholder="e.g. Aulia Rahman"
-                    value={inviteFullName}
-                    onChange={(e) => setInviteFullName(e.target.value)}
+                  <Label htmlFor="invite-phones">Phone Numbers</Label>
+                  <Textarea
+                    id="invite-phones"
+                    rows={6}
+                    placeholder={"+6281234567890\n+6289876543210\n+6285555111222"}
+                    value={bulkPhones}
+                    onChange={(e) => setBulkPhones(e.target.value)}
+                    className="font-mono text-sm"
                   />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="invite-phone">Phone Number</Label>
-                  <Input
-                    id="invite-phone"
-                    type="tel"
-                    placeholder="e.g. +6281234567890"
-                    value={invitePhone}
-                    onChange={(e) => setInvitePhone(e.target.value)}
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    {parsedPhones.length} number{parsedPhones.length === 1 ? "" : "s"} detected ·
+                    one per line, comma, or semicolon
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
@@ -402,8 +415,8 @@ function UsersPage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-                <Button onClick={sendInvite} disabled={sending}>
-                  {sending ? t("common.sending") : "Create invitation"}
+                <Button onClick={sendInvite} disabled={sending || parsedPhones.length === 0}>
+                  {sending ? t("common.sending") : `Create ${parsedPhones.length || ""} invitation${parsedPhones.length === 1 ? "" : "s"}`.trim()}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -519,14 +532,108 @@ function UsersPage() {
       </div>
 
       <div className="rounded-lg border bg-card shadow-card">
-        <div className="flex items-center justify-between border-b p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
           <div className="flex items-center gap-2 text-sm">
             <Mail className="h-4 w-4 text-muted-foreground" />
             <span className="font-semibold">{t("users.invitations.title")}</span>
             <span className="text-muted-foreground">·</span>
             <Badge variant="outline">{pendingInvitations.length} {t("common.pending")}</Badge>
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingInvitations.length === 0}
+              onClick={async () => {
+                const text = pendingInvitations
+                  .map((i) => buildInviteLink(i.token))
+                  .join("\n");
+                try {
+                  await navigator.clipboard.writeText(text);
+                  toast.success(`Copied ${pendingInvitations.length} link${pendingInvitations.length === 1 ? "" : "s"}`);
+                } catch {
+                  toast.error("Could not copy links");
+                }
+              }}
+            >
+              <Files className="h-4 w-4" /> Copy All Links
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pendingInvitations.length === 0}
+              onClick={() => {
+                const rows = [
+                  ["phone", "role", "expires_at", "account_expires_at", "invitation_link"],
+                  ...pendingInvitations.map((i) => [
+                    i.phone ?? "",
+                    i.role,
+                    new Date(i.expires_at).toISOString(),
+                    i.account_expires_at ? new Date(i.account_expires_at).toISOString() : "permanent",
+                    buildInviteLink(i.token),
+                  ]),
+                ];
+                const csv = rows
+                  .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+                  .join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `flowops-invitations-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download className="h-4 w-4" /> Export Invitation List
+            </Button>
+          </div>
         </div>
+        {lastBatch.length > 0 && (
+          <div className="border-b bg-muted/30 p-4">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">
+              Last batch created — {lastBatch.length} invitation{lastBatch.length === 1 ? "" : "s"}
+            </div>
+            <div className="space-y-1.5">
+              {lastBatch.map((b) => (
+                <div key={b.token} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-mono text-muted-foreground">{b.phone}</span>
+                  <code className="truncate rounded bg-background px-2 py-1 font-mono text-[11px]">
+                    {buildInviteLink(b.token)}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(buildInviteLink(b.token));
+                      toast.success("Link copied");
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      const msg = buildWaMessage({
+                        workspaceName,
+                        fullName: "there",
+                        role: b.role,
+                        link: buildInviteLink(b.token),
+                        expiresAt: new Date(Date.now() + 14 * 86400000).toISOString(),
+                      });
+                      window.open(buildWaUrl(b.phone, msg), "_blank", "noopener,noreferrer");
+                    }}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
