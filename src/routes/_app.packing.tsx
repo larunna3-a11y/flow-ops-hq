@@ -442,7 +442,11 @@ function PackingPage() {
         tracking_number: order.tracking_number,
         marketplace: finalMarketplace,
         courier: finalCourier,
-        status: packingStatusValue,
+        // packing_records.status has a DB CHECK constraint allowing only
+        // 'Pending' | 'Packed' | 'Shipped' | 'Cancelled'. The missing-items
+        // distinction is carried by completion_status below, not by status —
+        // do not put packingStatusValue ("Packed with Missing Items") here.
+        status: "Packed",
         verified_skus: verifiedSkus,
         missing_skus: missingSkus,
         missing_quantity: totalMissing,
@@ -909,7 +913,9 @@ function PackingPage() {
                       {new Date(r.scan_timestamp).toLocaleString()}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {r.tracking_number ?? "—"}
+                    </TableCell>
                     <TableCell>{r.marketplace ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
                     <TableCell>{r.user_name}</TableCell>
