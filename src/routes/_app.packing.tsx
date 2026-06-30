@@ -280,6 +280,13 @@ function PackingPage() {
       return;
     }
 
+    // Role gate: Packers can edit ONLY their own submissions.
+    if (!canEditRecord(rec.user_id as string)) {
+      toast.error("You can only edit packing records that you submitted.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
     // Fetch the associated order
     const orderCode = rec.order_number ?? rec.tracking_number ?? rec.raw_code;
     if (!orderCode) {
