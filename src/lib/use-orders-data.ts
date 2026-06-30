@@ -232,7 +232,13 @@ export function useDashboardStats(range?: { from: string; to: string }) {
  *                   historical orders are never deleted or modified.
  * - pendingOrders = ALL orders with packing_status = 'pending', regardless of the
  *                   day they were imported (carries over unfinished work).
- * - packedOrders  = ALL orders with packing_status = 'packed' (all-time).
+ * - packedOrders  = SUM(all successful packing confirmations today) across EVERY
+ *                   packer in the workspace — i.e. count of packing_records with
+ *                   status = 'Packed' and created_at today, workspace-wide (never
+ *                   scoped to a single user). This is the exact same query
+ *                   (workspace_id + status='Packed' + today) used to build the
+ *                   "Today's Packers" list in useTodayPackers(), so this number
+ *                   always equals the sum of every packer's count shown there.
  * - packingProgress = packedOrders / todayOrders * 100 (capped at 100, 0 when no
  *                   orders were imported today).
  */
@@ -263,11 +269,15 @@ export function usePackingProgress() {
           .eq("workspace_id", wid)
           .eq("packing_status", "pending"),
 
+        // Workspace-wide count of successful packing confirmations made today,
+        // across ALL packers — never filtered to a single user.
         db
-          .from("orders")
+          .from("packing_records")
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", wid)
-          .eq("packing_status", "packed"),
+          .eq("status", "Packed")
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString()),
       ]);
 
       const todayOrders = todayOrdersRes.count ?? 0;
