@@ -16,6 +16,7 @@ export type PackingRecord = {
   marketplace: string | null;
   courier: string | null;
   status: "Pending" | "Packed" | "Shipped" | "Cancelled";
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -209,7 +210,9 @@ export function useTodayPackers() {
         .gte("created_at", todayStart.toISOString())
         .lte("created_at", todayEnd.toISOString())
         .order("scan_timestamp", { ascending: false })
-        .limit(5000);
+        // High cap, not a realistic ceiling — keeps this exactly in sync with the
+        // unbounded COUNT() used for the Dashboard "Packed" KPI (usePackingProgress).
+        .limit(50000);
       if (error) throw error;
 
       const byUser = new Map<string, TodayPacker>();
