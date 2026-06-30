@@ -967,8 +967,13 @@ function ReturnInspectionSheet({
                     />
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <Button onClick={saveInspection} disabled={savingForm}>
+                <div className="flex items-center justify-end gap-3">
+                  {!canEditThisReturn && (
+                    <span className="text-xs text-muted-foreground">
+                      Read-only — only the submitter or Owner/Supervisor can edit this return.
+                    </span>
+                  )}
+                  <Button onClick={saveInspection} disabled={savingForm || !canEditThisReturn}>
                     {savingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save inspection
                   </Button>
