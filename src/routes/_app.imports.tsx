@@ -192,18 +192,31 @@ function ImportsPage() {
     if (!wid) return;
     setDeleting(true);
     try {
-      const { data: imp } = await db.from("imports").select("created_at, filename").eq("id", id).maybeSingle();
+      const { data: imp, error: impFetchErr } = await db
+        .from("imports")
+        .select("created_at, filename")
+        .eq("id", id)
+        .maybeSingle();
+      if (impFetchErr) {
+        toast.error(impFetchErr.message);
+        return;
+      }
+
       if (imp) {
         const createdAt = new Date(imp.created_at);
         const from = new Date(createdAt.getTime() - 60_000).toISOString();
         const to = new Date(createdAt.getTime() + 60_000).toISOString();
 
-        const { data: orderRows } = await db
+        const { data: orderRows, error: orderFetchErr } = await db
           .from("orders")
           .select("id, order_number, tracking_number")
           .eq("workspace_id", wid)
           .gte("created_at", from)
           .lte("created_at", to);
+        if (orderFetchErr) {
+          toast.error(orderFetchErr.message);
+          return;
+        }
 
         const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
         const orderNumbers = (orderRows ?? [])
@@ -215,27 +228,56 @@ function ImportsPage() {
 
         if (orderIds.length) {
           // 1) Related returns (and their dependent rows cascade via FK).
-          await db.from("returns").delete().eq("workspace_id", wid).in("order_id", orderIds);
+          const { error: returnsErr } = await db
+            .from("returns")
+            .delete()
+            .eq("workspace_id", wid)
+            .in("order_id", orderIds);
+          if (returnsErr) {
+            toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
+            return;
+          }
 
           // 2) Related packing_records — matched by order_number OR tracking_number.
           if (orderNumbers.length) {
-            await db
+            const { error: prByNumberErr } = await db
               .from("packing_records")
               .delete()
               .eq("workspace_id", wid)
               .in("order_number", orderNumbers);
+            if (prByNumberErr) {
+              toast.error(`Couldn't delete packing records: ${prByNumberErr.message}`);
+              return;
+            }
           }
           if (trackingNumbers.length) {
-            await db
+            const { error: prByTrackingErr } = await db
               .from("packing_records")
               .delete()
               .eq("workspace_id", wid)
               .in("tracking_number", trackingNumbers);
+            if (prByTrackingErr) {
+              toast.error(`Couldn't delete packing records: ${prByTrackingErr.message}`);
+              return;
+            }
           }
 
           // 3) Order items, then orders (FK order).
-          await db.from("order_items").delete().eq("workspace_id", wid).in("order_id", orderIds);
-          await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
+          const { error: itemsErr } = await db
+            .from("order_items")
+            .delete()
+            .eq("workspace_id", wid)
+            .in("order_id", orderIds);
+          if (itemsErr) {
+            toast.error(`Couldn't delete order items: ${itemsErr.message}`);
+            return;
+          }
+
+          const { error: ordersErr } = await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
+          if (ordersErr) {
+            toast.error(`Couldn't delete orders: ${ordersErr.message}`);
+            return;
+          }
         }
       }
 
@@ -446,9 +488,7 @@ function ImportsPage() {
             <AlertDialogTitle>Delete this imported batch?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  This will remove all imported orders and their related data.
-                </p>
+                <p>This will remove all imported orders and their related data.</p>
                 <p>
                   <strong>This action cannot be undone.</strong>
                 </p>
