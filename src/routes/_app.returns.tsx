@@ -649,6 +649,10 @@ function ReturnInspectionSheet({
 
   async function uploadPhotos(files: FileList) {
     if (!record || !workspaceId) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     const existing = (record.inspection_photos ?? []) as { path: string }[];
     const added: { path: string }[] = [];
     for (const file of Array.from(files)) {
@@ -677,6 +681,10 @@ function ReturnInspectionSheet({
 
   async function removePhoto(path: string) {
     if (!record) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     await supabase.storage.from("return-photos").remove([path]);
     const next = (record.inspection_photos ?? []).filter((p) => p.path !== path);
     await supabase.from("returns").update({ inspection_photos: next as never }).eq("id", record.id);
