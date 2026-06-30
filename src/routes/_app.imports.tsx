@@ -443,37 +443,30 @@ function ImportsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this imported batch?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  You are about to delete the import record for{" "}
-                  <span className="font-mono font-semibold text-foreground">{deleteTarget?.filename}</span>.
+                  This will remove all imported orders and their related data.
                 </p>
                 <p>
-                  Choose what to delete — the import log only, or the import log <strong>and all orders</strong> that
-                  were created during that import batch (based on creation time). Deleting orders is irreversible.
+                  <strong>This action cannot be undone.</strong>
+                </p>
+                <p className="text-xs">
+                  File: <span className="font-mono text-foreground">{deleteTarget?.filename}</span>
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              disabled={deleting}
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, false)}
-            >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log only
-            </Button>
             <AlertDialogAction
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, true)}
+              onClick={() => deleteTarget && deleteImport(deleteTarget.id)}
             >
               {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log + orders
+              Delete batch
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
