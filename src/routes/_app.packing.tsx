@@ -137,8 +137,8 @@ function PackingPage() {
     role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
 
   const recordsQuery = usePackingRecords();
+  const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
-  const ordersQuery = useOrders();
 
   /**
    * KPIs are derived from the SAME source of truth as the Dashboard:
