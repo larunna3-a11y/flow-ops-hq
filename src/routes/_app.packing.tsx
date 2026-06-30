@@ -897,36 +897,38 @@ function PackingPage() {
                 <TableHead>Courier</TableHead>
                 <TableHead>Packer</TableHead>
                 <TableHead className="text-right">Status</TableHead>
-                {(canOverrideDuplicate || canDelete) && <TableHead className="text-right w-24">Actions</TableHead>}
+                {<TableHead className="text-right w-24">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {records.slice(0, 100).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {new Date(r.scan_timestamp).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
-                  <TableCell>{r.marketplace ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
-                  <TableCell>{r.user_name}</TableCell>
-                  <TableCell className="text-right">
-                    <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
-                  </TableCell>
-                  {(canOverrideDuplicate || canDelete) && (
+              {records.slice(0, 100).map((r) => {
+                const mayEdit = canEditRecord(r.user_id);
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {new Date(r.scan_timestamp).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
+                    <TableCell>{r.marketplace ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
+                    <TableCell>{r.user_name}</TableCell>
+                    <TableCell className="text-right">
+                      <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {/* Any packer can re-edit their own record; Owner/Supervisor can edit any */}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          title="Re-edit this submission"
-                          onClick={() => startEdit(r.id)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {mayEdit && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Re-edit this submission"
+                            onClick={() => startEdit(r.id)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {canDelete && (
                           <Button
                             size="icon"
@@ -938,11 +940,12 @@ function PackingPage() {
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        {!mayEdit && !canDelete && <span className="text-xs text-muted-foreground">—</span>}
                       </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
               {!records.length && (
                 <TableRow>
                   <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">
