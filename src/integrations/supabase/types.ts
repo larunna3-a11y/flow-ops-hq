@@ -585,48 +585,6 @@ export type Database = {
           },
         ];
       };
-      invitation_uses: {
-        Row: {
-          full_name: string;
-          id: string;
-          invitation_id: string;
-          joined_at: string;
-          user_id: string;
-          workspace_id: string;
-        };
-        Insert: {
-          full_name: string;
-          id?: string;
-          invitation_id: string;
-          joined_at?: string;
-          user_id: string;
-          workspace_id: string;
-        };
-        Update: {
-          full_name?: string;
-          id?: string;
-          invitation_id?: string;
-          joined_at?: string;
-          user_id?: string;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "invitation_uses_invitation_id_fkey";
-            columns: ["invitation_id"];
-            isOneToOne: false;
-            referencedRelation: "invitations";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "invitation_uses_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: false;
-            referencedRelation: "workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       notifications: {
         Row: {
           body: string | null;
