@@ -948,7 +948,7 @@ function PackingPage() {
               })}
               {!records.length && (
                 <TableRow>
-                  <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
                     No scans yet. Use the form above to record your first scan.
                   </TableCell>
                 </TableRow>
