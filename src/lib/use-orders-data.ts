@@ -280,6 +280,160 @@ export function usePackingProgress() {
   });
 }
 
+// --- Packing Exception Report (Reports module — Owner/Supervisor) ---
+export type PackingExceptionFilters = {
+  /** ISO datetime — inclusive lower bound on orders.packed_at */
+  from?: string;
+  /** ISO datetime — inclusive upper bound on orders.packed_at */
+  to?: string;
+  marketplace?: string;
+  storeId?: string;
+  courier?: string;
+  packerId?: string;
+  /** "all" | "complete" (no missing items) | "incomplete" (has missing items) */
+  completeness?: "all" | "complete" | "incomplete";
+};
+
+export type PackingExceptionRow = {
+  orderId: string;
+  orderNumber: string;
+  trackingNumber: string | null;
+  customerName: string | null;
+  marketplace: string | null;
+  storeName: string | null;
+  courier: string | null;
+  packedByName: string | null;
+  packedAt: string | null;
+  totalSku: number;
+  packedSku: number;
+  missingSku: number;
+  missingQuantity: number;
+  missingSkuList: string;
+  packingNotes: string;
+  isComplete: boolean;
+};
+
+/**
+ * Live "Packing Exception Report" for Reports (Owner/Supervisor).
+ * Sourced directly from `orders` (the same table Dashboard's stats use) joined
+ * client-side with `order_items` (for total SKU counts) and `packing_records`
+ * (for the missing-SKU breakdown + packing notes captured at confirmation time).
+ * All heavy filtering (date range, marketplace, store, courier, packer,
+ * complete/incomplete) happens server-side so this stays cheap on large datasets.
+ */
+export function usePackingExceptions(filters: PackingExceptionFilters) {
+  const ws = useWorkspace();
+  const wid = ws.data?.workspace?.id;
+  return useQuery({
+    queryKey: ["packing_exceptions", wid, filters],
+    enabled: !!wid,
+    queryFn: async () => {
+      let q = db
+        .from("orders")
+        .select(
+          "id, order_number, tracking_number, customer_name, marketplace, store_name, store_id, courier, packed_by, packed_by_name, packed_at, packing_status",
+        )
+        .eq("workspace_id", wid)
+        .in("packing_status", ["packed", "packed_with_missing"])
+        .order("packed_at", { ascending: false })
+        .limit(2000);
+
+      if (filters.from) q = q.gte("packed_at", filters.from);
+      if (filters.to) q = q.lte("packed_at", filters.to);
+      if (filters.marketplace && filters.marketplace !== "all") q = q.eq("marketplace", filters.marketplace);
+      if (filters.courier && filters.courier !== "all") q = q.eq("courier", filters.courier);
+      if (filters.storeId && filters.storeId !== "all") q = q.eq("store_id", filters.storeId);
+      if (filters.packerId && filters.packerId !== "all") q = q.eq("packed_by", filters.packerId);
+      if (filters.completeness === "complete") q = q.eq("packing_status", "packed");
+      if (filters.completeness === "incomplete") q = q.eq("packing_status", "packed_with_missing");
+
+      const { data: orderRowsRaw, error } = await q;
+      if (error) throw error;
+      const orderRows = (orderRowsRaw ?? []) as Array<{
+        id: string;
+        order_number: string;
+        tracking_number: string | null;
+        customer_name: string | null;
+        marketplace: string | null;
+        store_name: string | null;
+        store_id: string | null;
+        courier: string | null;
+        packed_by: string | null;
+        packed_by_name: string | null;
+        packed_at: string | null;
+        packing_status: string;
+      }>;
+      if (!orderRows.length) return [] as PackingExceptionRow[];
+
+      const orderIds = orderRows.map((o) => o.id);
+      const orderNumbers = Array.from(new Set(orderRows.map((o) => o.order_number)));
+
+      const [itemsRes, recordsRes] = await Promise.all([
+        db.from("order_items").select("order_id").eq("workspace_id", wid).in("order_id", orderIds),
+        db
+          .from("packing_records")
+          .select("order_number, missing_skus, missing_quantity, notes, updated_at")
+          .eq("workspace_id", wid)
+          .in("order_number", orderNumbers)
+          .order("updated_at", { ascending: false }),
+      ]);
+
+      const totalSkuMap = new Map<string, number>();
+      for (const it of (itemsRes.data ?? []) as Array<{ order_id: string }>) {
+        totalSkuMap.set(it.order_id, (totalSkuMap.get(it.order_id) ?? 0) + 1);
+      }
+
+      // Keep only the most recent packing_record per order_number (already sorted desc).
+      type MissingSku = { sku_master?: string | null; sku_marketplace?: string | null };
+      const recordMap = new Map<
+        string,
+        { missing_skus: MissingSku[]; missing_quantity: number; notes: string | null }
+      >();
+      for (const r of (recordsRes.data ?? []) as Array<{
+        order_number: string | null;
+        missing_skus: MissingSku[] | null;
+        missing_quantity: number | null;
+        notes: string | null;
+      }>) {
+        if (!r.order_number || recordMap.has(r.order_number)) continue;
+        recordMap.set(r.order_number, {
+          missing_skus: r.missing_skus ?? [],
+          missing_quantity: r.missing_quantity ?? 0,
+          notes: r.notes ?? null,
+        });
+      }
+
+      return orderRows.map((o) => {
+        const rec = recordMap.get(o.order_number);
+        const totalSku = totalSkuMap.get(o.id) ?? 0;
+        const missingList = rec?.missing_skus ?? [];
+        const missingSku = missingList.length;
+        const missingQuantity = rec?.missing_quantity ?? 0;
+        const packedSku = Math.max(0, totalSku - missingSku);
+        const missingSkuList = missingList.map((m) => m.sku_master || m.sku_marketplace || "—").join(", ");
+        return {
+          orderId: o.id,
+          orderNumber: o.order_number,
+          trackingNumber: o.tracking_number,
+          customerName: o.customer_name,
+          marketplace: o.marketplace,
+          storeName: o.store_name,
+          courier: o.courier,
+          packedByName: o.packed_by_name,
+          packedAt: o.packed_at,
+          totalSku,
+          packedSku,
+          missingSku,
+          missingQuantity,
+          missingSkuList,
+          packingNotes: rec?.notes ?? "",
+          isComplete: o.packing_status === "packed",
+        } satisfies PackingExceptionRow;
+      });
+    },
+  });
+}
+
 export function useOrders(filters?: { search?: string; marketplace?: string; store?: string; status?: string }) {
   const ws = useWorkspace();
   const wid = ws.data?.workspace?.id;
