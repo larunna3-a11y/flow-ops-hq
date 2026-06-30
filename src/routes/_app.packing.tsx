@@ -129,8 +129,12 @@ function PackingPage() {
   const [deleting, setDeleting] = useState(false);
 
   const role = ws.data?.role ?? null;
+  const currentUserId = ws.data?.userId ?? null;
   const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
   const canDelete = role === "Owner" || role === "Supervisor";
+  /** Owners & Supervisors can edit every record; Packers only their own. */
+  const canEditRecord = (recordUserId: string | null | undefined) =>
+    role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
