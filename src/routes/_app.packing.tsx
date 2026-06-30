@@ -140,24 +140,24 @@ function PackingPage() {
   const records = recordsQuery.data ?? [];
   const ordersQuery = useOrders();
 
-  // ── KPIs ──────────────────────────────────────────────────────────────────
-  // totalOrders  = all orders (fixed base from this import batch)
-  // inQueue      = orders still packing_status === "pending"  → live, decrements as packs confirmed
-  // packedOrders = orders with packing_status === "packed" or "packed_with_missing"
-  // packedToday  = packing records created today (not Pending/Cancelled)
+  /**
+   * KPIs are derived from the SAME source of truth as the Dashboard:
+   *   pendingOrders / totalOrders / packedOrders come from useDashboardStats
+   *   which runs server-side COUNTs against the orders table.
+   * This guarantees Dashboard's "Pending Orders" and Packing's "In Queue"
+   * always show identical numbers. After every confirmPacking we invalidate
+   * `dashboard_stats` and `orders`, so both widgets refresh automatically.
+   */
+  const dashboardStats = useDashboardStats();
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
-    const orders = ordersQuery.data ?? [];
 
-    const totalOrders = orders.length;
-    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
-    const packedOrders = orders.filter(
-      (o) => o.packing_status === "packed" || o.packing_status === "packed_with_missing",
-    ).length;
-    // Progress 0–100 of how many orders have been packed out of total
+    const totalOrders = dashboardStats.data?.totalOrders ?? 0;
+    const inQueue = dashboardStats.data?.pendingOrders ?? 0;
+    const packedOrders = dashboardStats.data?.packedOrders ?? 0;
     const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
 
     return {
@@ -169,7 +169,7 @@ function PackingPage() {
       packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
       shipped: records.filter((r) => r.status === "Shipped").length,
     };
-  }, [records, ordersQuery.data]);
+  }, [records, dashboardStats.data]);
 
   async function lookup(code: string, scanType: "keyboard" | "camera") {
     const value = code.trim();
