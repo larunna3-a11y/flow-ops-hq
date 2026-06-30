@@ -137,7 +137,6 @@ function PackingPage() {
     role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
 
   const recordsQuery = usePackingRecords();
-  const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
 
   /**
