@@ -175,62 +175,86 @@ function ImportsPage() {
   }
 
   /**
-   * Delete an import batch record AND all the orders/items that came with it.
-   * We identify them by the filename + workspace (the import record itself doesn't
-   * store a foreign key back to the orders, so we delete the orders that were
-   * created around the same time window by matching order_number patterns is not
-   * reliable — instead we delete the import log row only and leave orders intact,
-   * which is the safest behaviour. The user re-imports after deletion to start fresh.)
+   * Delete an imported batch and ALL data it produced:
+   *   - orders created during the import window
+   *   - their order_items
+   *   - related packing_records (matched by order_number / tracking_number)
+   *   - related returns (matched by order_id)
+   *   - the import history record itself
    *
-   * If the user wants orders deleted too they can use the Orders page filters.
-   * We ask them clearly in the confirmation dialog.
+   * Orders are matched by a tight ±60s window around the import's created_at,
+   * which is the period in which confirmImport() inserts its rows. After
+   * deletion the same Desty OMS file can be re-imported because the unique
+   * (workspace_id, order_number) rows are gone.
    */
-  async function deleteImport(id: string, deleteOrders: boolean) {
+  async function deleteImport(id: string) {
     const wid = ws.data?.workspace?.id;
     if (!wid) return;
     setDeleting(true);
     try {
-      if (deleteOrders) {
-        // Find the import record to get its creation time window
-        const { data: imp } = await db.from("imports").select("created_at, filename").eq("id", id).maybeSingle();
-        if (imp) {
-          // Delete orders created within a narrow window around the import time
-          // (±60 seconds is a reasonable proxy since we insert orders then record the import).
-          const createdAt = new Date(imp.created_at);
-          const from = new Date(createdAt.getTime() - 60_000).toISOString();
-          const to = new Date(createdAt.getTime() + 60_000).toISOString();
+      const { data: imp } = await db.from("imports").select("created_at, filename").eq("id", id).maybeSingle();
+      if (imp) {
+        const createdAt = new Date(imp.created_at);
+        const from = new Date(createdAt.getTime() - 60_000).toISOString();
+        const to = new Date(createdAt.getTime() + 60_000).toISOString();
 
-          // Get order ids in that window
-          const { data: orderRows } = await db
-            .from("orders")
-            .select("id")
-            .eq("workspace_id", wid)
-            .gte("created_at", from)
-            .lte("created_at", to);
+        const { data: orderRows } = await db
+          .from("orders")
+          .select("id, order_number, tracking_number")
+          .eq("workspace_id", wid)
+          .gte("created_at", from)
+          .lte("created_at", to);
 
-          const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
+        const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
+        const orderNumbers = (orderRows ?? [])
+          .map((r: { order_number: string | null }) => r.order_number)
+          .filter((n: string | null): n is string => !!n);
+        const trackingNumbers = (orderRows ?? [])
+          .map((r: { tracking_number: string | null }) => r.tracking_number)
+          .filter((n: string | null): n is string => !!n);
 
-          if (orderIds.length) {
-            // Delete order_items first (FK constraint)
-            await db.from("order_items").delete().eq("workspace_id", wid).in("order_id", orderIds);
-            await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
+        if (orderIds.length) {
+          // 1) Related returns (and their dependent rows cascade via FK).
+          await db.from("returns").delete().eq("workspace_id", wid).in("order_id", orderIds);
+
+          // 2) Related packing_records — matched by order_number OR tracking_number.
+          if (orderNumbers.length) {
+            await db
+              .from("packing_records")
+              .delete()
+              .eq("workspace_id", wid)
+              .in("order_number", orderNumbers);
           }
+          if (trackingNumbers.length) {
+            await db
+              .from("packing_records")
+              .delete()
+              .eq("workspace_id", wid)
+              .in("tracking_number", trackingNumbers);
+          }
+
+          // 3) Order items, then orders (FK order).
+          await db.from("order_items").delete().eq("workspace_id", wid).in("order_id", orderIds);
+          await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
         }
       }
 
-      // Delete the import log row
+      // 4) Finally delete the import history row.
       const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
       if (error) {
         toast.error(error.message);
         return;
       }
 
-      toast.success(deleteOrders ? "Import and associated orders deleted." : "Import record deleted.");
+      toast.success("Imported batch and all related data deleted.");
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
+      qc.invalidateQueries({ queryKey: ["packing_records"] });
+      qc.invalidateQueries({ queryKey: ["returns"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed.");
     } finally {
@@ -419,37 +443,30 @@ function ImportsPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+            <AlertDialogTitle>Delete this imported batch?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  You are about to delete the import record for{" "}
-                  <span className="font-mono font-semibold text-foreground">{deleteTarget?.filename}</span>.
+                  This will remove all imported orders and their related data.
                 </p>
                 <p>
-                  Choose what to delete — the import log only, or the import log <strong>and all orders</strong> that
-                  were created during that import batch (based on creation time). Deleting orders is irreversible.
+                  <strong>This action cannot be undone.</strong>
+                </p>
+                <p className="text-xs">
+                  File: <span className="font-mono text-foreground">{deleteTarget?.filename}</span>
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              disabled={deleting}
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, false)}
-            >
-              {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log only
-            </Button>
             <AlertDialogAction
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteTarget && deleteImport(deleteTarget.id, true)}
+              onClick={() => deleteTarget && deleteImport(deleteTarget.id)}
             >
               {deleting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Delete log + orders
+              Delete batch
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

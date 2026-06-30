@@ -42,7 +42,7 @@ import { usePackingRecords } from "@/lib/use-warehouse-data";
 import { logActivity } from "@/lib/activity.functions";
 import { notify } from "@/lib/notify";
 import { detect, type DetectionResult } from "@/lib/detection";
-import { MARKETPLACES, COURIERS, useOrders } from "@/lib/use-orders-data";
+import { MARKETPLACES, COURIERS, useDashboardStats } from "@/lib/use-orders-data";
 
 export const Route = createFileRoute("/_app/packing")({
   head: () => ({
@@ -129,31 +129,34 @@ function PackingPage() {
   const [deleting, setDeleting] = useState(false);
 
   const role = ws.data?.role ?? null;
+  const currentUserId = ws.data?.userId ?? null;
   const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
   const canDelete = role === "Owner" || role === "Supervisor";
+  /** Owners & Supervisors can edit every record; Packers only their own. */
+  const canEditRecord = (recordUserId: string | null | undefined) =>
+    role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
-  const ordersQuery = useOrders();
 
-  // ── KPIs ──────────────────────────────────────────────────────────────────
-  // totalOrders  = all orders (fixed base from this import batch)
-  // inQueue      = orders still packing_status === "pending"  → live, decrements as packs confirmed
-  // packedOrders = orders with packing_status === "packed" or "packed_with_missing"
-  // packedToday  = packing records created today (not Pending/Cancelled)
+  /**
+   * KPIs are derived from the SAME source of truth as the Dashboard:
+   *   pendingOrders / totalOrders / packedOrders come from useDashboardStats
+   *   which runs server-side COUNTs against the orders table.
+   * This guarantees Dashboard's "Pending Orders" and Packing's "In Queue"
+   * always show identical numbers. After every confirmPacking we invalidate
+   * `dashboard_stats` and `orders`, so both widgets refresh automatically.
+   */
+  const dashboardStats = useDashboardStats();
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
-    const orders = ordersQuery.data ?? [];
 
-    const totalOrders = orders.length;
-    const inQueue = orders.filter((o) => o.packing_status === "pending").length;
-    const packedOrders = orders.filter(
-      (o) => o.packing_status === "packed" || o.packing_status === "packed_with_missing",
-    ).length;
-    // Progress 0–100 of how many orders have been packed out of total
+    const totalOrders = dashboardStats.data?.totalOrders ?? 0;
+    const inQueue = dashboardStats.data?.pendingOrders ?? 0;
+    const packedOrders = dashboardStats.data?.packedOrders ?? 0;
     const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
 
     return {
@@ -165,7 +168,7 @@ function PackingPage() {
       packedToday: todayRecords.filter((r) => r.status !== "Pending" && r.status !== "Cancelled").length,
       shipped: records.filter((r) => r.status === "Shipped").length,
     };
-  }, [records, ordersQuery.data]);
+  }, [records, dashboardStats.data]);
 
   async function lookup(code: string, scanType: "keyboard" | "camera") {
     const value = code.trim();
@@ -272,6 +275,13 @@ function PackingPage() {
 
     if (recErr || !rec) {
       toast.error("Could not load packing record for editing.");
+      setScan(INITIAL_STATE);
+      return;
+    }
+
+    // Role gate: Packers can edit ONLY their own submissions.
+    if (!canEditRecord(rec.user_id as string)) {
+      toast.error("You can only edit packing records that you submitted.");
       setScan(INITIAL_STATE);
       return;
     }
@@ -887,36 +897,38 @@ function PackingPage() {
                 <TableHead>Courier</TableHead>
                 <TableHead>Packer</TableHead>
                 <TableHead className="text-right">Status</TableHead>
-                {(canOverrideDuplicate || canDelete) && <TableHead className="text-right w-24">Actions</TableHead>}
+                {<TableHead className="text-right w-24">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {records.slice(0, 100).map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {new Date(r.scan_timestamp).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
-                  <TableCell>{r.marketplace ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
-                  <TableCell>{r.user_name}</TableCell>
-                  <TableCell className="text-right">
-                    <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
-                  </TableCell>
-                  {(canOverrideDuplicate || canDelete) && (
+              {records.slice(0, 100).map((r) => {
+                const mayEdit = canEditRecord(r.user_id);
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {new Date(r.scan_timestamp).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{r.tracking_number ?? "—"}</TableCell>
+                    <TableCell>{r.marketplace ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.courier ?? "—"}</TableCell>
+                    <TableCell>{r.user_name}</TableCell>
+                    <TableCell className="text-right">
+                      <StatusPill tone={statusToTone(r.status.toLowerCase())}>{r.status}</StatusPill>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {/* Any packer can re-edit their own record; Owner/Supervisor can edit any */}
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          title="Re-edit this submission"
-                          onClick={() => startEdit(r.id)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        {mayEdit && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            title="Re-edit this submission"
+                            onClick={() => startEdit(r.id)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {canDelete && (
                           <Button
                             size="icon"
@@ -928,14 +940,15 @@ function PackingPage() {
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        {!mayEdit && !canDelete && <span className="text-xs text-muted-foreground">—</span>}
                       </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                  </TableRow>
+                );
+              })}
               {!records.length && (
                 <TableRow>
-                  <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
                     No scans yet. Use the form above to record your first scan.
                   </TableCell>
                 </TableRow>

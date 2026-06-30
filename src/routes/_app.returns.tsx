@@ -556,8 +556,23 @@ function ReturnInspectionSheet({
   const ws = useWorkspace();
   const log = useServerFn(logActivity);
   const workspaceId = ws.data?.workspace?.id;
+  const role = ws.data?.role ?? null;
+  const currentUserId = ws.data?.userId ?? null;
   const id = record?.id ?? null;
   const fileInput = useRef<HTMLInputElement>(null);
+
+  /**
+   * Edit permissions:
+   *  - Owners & Supervisors: edit any return record.
+   *  - Return Staff: only the returns they submitted (inspector_id === me,
+   *    or the record has not been claimed yet so they can take ownership).
+   *  - Other roles: read-only.
+   */
+  const canEditThisReturn = !!record && (
+    role === "Owner" ||
+    role === "Supervisor" ||
+    (role === "Return Staff" && (!record.inspector_id || record.inspector_id === currentUserId))
+  );
 
   const items = useQuery({
     queryKey: ["return-items", id],
@@ -634,6 +649,10 @@ function ReturnInspectionSheet({
 
   async function uploadPhotos(files: FileList) {
     if (!record || !workspaceId) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     const existing = (record.inspection_photos ?? []) as { path: string }[];
     const added: { path: string }[] = [];
     for (const file of Array.from(files)) {
@@ -662,6 +681,10 @@ function ReturnInspectionSheet({
 
   async function removePhoto(path: string) {
     if (!record) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     await supabase.storage.from("return-photos").remove([path]);
     const next = (record.inspection_photos ?? []).filter((p) => p.path !== path);
     await supabase.from("returns").update({ inspection_photos: next as never }).eq("id", record.id);
@@ -670,6 +693,10 @@ function ReturnInspectionSheet({
   }
 
   async function updateItem(item: ReturnItem, patch: Partial<ReturnItem>) {
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     const { error } = await supabase.from("return_items").update(patch).eq("id", item.id);
     if (error) {
       toast.error(error.message);
@@ -680,6 +707,10 @@ function ReturnInspectionSheet({
 
   async function saveInspection() {
     if (!record || !workspaceId) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     setSavingForm(true);
     const user = ws.data?.userId;
     const { data: prof } = user
@@ -936,8 +967,13 @@ function ReturnInspectionSheet({
                     />
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <Button onClick={saveInspection} disabled={savingForm}>
+                <div className="flex items-center justify-end gap-3">
+                  {!canEditThisReturn && (
+                    <span className="text-xs text-muted-foreground">
+                      Read-only — only the submitter or Owner/Supervisor can edit this return.
+                    </span>
+                  )}
+                  <Button onClick={saveInspection} disabled={savingForm || !canEditThisReturn}>
                     {savingForm && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save inspection
                   </Button>
