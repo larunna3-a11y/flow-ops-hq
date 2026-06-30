@@ -685,6 +685,10 @@ function ReturnInspectionSheet({
   }
 
   async function updateItem(item: ReturnItem, patch: Partial<ReturnItem>) {
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     const { error } = await supabase.from("return_items").update(patch).eq("id", item.id);
     if (error) {
       toast.error(error.message);
@@ -695,6 +699,10 @@ function ReturnInspectionSheet({
 
   async function saveInspection() {
     if (!record || !workspaceId) return;
+    if (!canEditThisReturn) {
+      toast.error("You can only edit return records that you submitted.");
+      return;
+    }
     setSavingForm(true);
     const user = ws.data?.userId;
     const { data: prof } = user
