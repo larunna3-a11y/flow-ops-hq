@@ -42,7 +42,7 @@ import { usePackingRecords } from "@/lib/use-warehouse-data";
 import { logActivity } from "@/lib/activity.functions";
 import { notify } from "@/lib/notify";
 import { detect, type DetectionResult } from "@/lib/detection";
-import { MARKETPLACES, COURIERS, useOrders } from "@/lib/use-orders-data";
+import { MARKETPLACES, COURIERS, useOrders, useDashboardStats } from "@/lib/use-orders-data";
 
 export const Route = createFileRoute("/_app/packing")({
   head: () => ({
