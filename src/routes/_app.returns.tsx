@@ -556,8 +556,23 @@ function ReturnInspectionSheet({
   const ws = useWorkspace();
   const log = useServerFn(logActivity);
   const workspaceId = ws.data?.workspace?.id;
+  const role = ws.data?.role ?? null;
+  const currentUserId = ws.data?.userId ?? null;
   const id = record?.id ?? null;
   const fileInput = useRef<HTMLInputElement>(null);
+
+  /**
+   * Edit permissions:
+   *  - Owners & Supervisors: edit any return record.
+   *  - Return Staff: only the returns they submitted (inspector_id === me,
+   *    or the record has not been claimed yet so they can take ownership).
+   *  - Other roles: read-only.
+   */
+  const canEditThisReturn = !!record && (
+    role === "Owner" ||
+    role === "Supervisor" ||
+    (role === "Return Staff" && (!record.inspector_id || record.inspector_id === currentUserId))
+  );
 
   const items = useQuery({
     queryKey: ["return-items", id],
