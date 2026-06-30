@@ -16,6 +16,7 @@ export type PackingRecord = {
   marketplace: string | null;
   courier: string | null;
   status: "Pending" | "Packed" | "Shipped" | "Cancelled";
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
