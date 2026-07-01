@@ -139,23 +139,27 @@ function PackingPage() {
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
 
-  /**
+  /*
    * KPIs are derived from the SAME source of truth as the Dashboard:
-   *   pendingOrders / totalOrders / packedOrders come from useDashboardStats
-   *   which runs server-side COUNTs against the orders table.
-   * This guarantees Dashboard's "Pending Orders" and Packing's "In Queue"
-   * always show identical numbers. After every confirmPacking we invalidate
-   * `dashboard_stats` and `orders`, so both widgets refresh automatically.
+   * - totalOrders / pendingOrders (inQueue) come from useOrderCounts()
+   *   — range-free, shared cache key ["order_counts", wid], identical to
+   *   what Dashboard's KPI cards consume.
+   * - packedOrders comes from useDashboardStats() which counts packing_records
+   *   with status = 'Packed' via server-side COUNT (no row limit).
+   * This guarantees Dashboard's "Total Orders" / "Pending Orders" and Packing's
+   * "Total Orders" / "In Queue" always show identical numbers.
+   * After every confirmPacking or deleteRecord we invalidate both
+   * `order_counts` and `dashboard_stats` so all pages refresh atomically.
    */
+  const orderCounts = useOrderCounts();
   const dashboardStats = useDashboardStats();
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
-
-    const totalOrders = dashboardStats.data?.totalOrders ?? 0;
-    const inQueue = dashboardStats.data?.pendingOrders ?? 0;
+    const totalOrders = orderCounts.data?.totalOrders ?? 0;
+    const inQueue = orderCounts.data?.pendingOrders ?? 0;
     const packedOrders = dashboardStats.data?.packedOrders ?? 0;
     const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
 
