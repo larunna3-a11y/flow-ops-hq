@@ -41,6 +41,7 @@ function ImportsPage() {
   const user = useCurrentUser();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deleteBatch = useServerFn(deleteImportBatch);
 
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -52,6 +53,7 @@ function ImportsPage() {
 
   const role = ws.data?.role ?? null;
   const canDelete = role === "Owner" || role === "Supervisor";
+
 
   async function onFileChosen(file: File) {
     setParsing(true);
