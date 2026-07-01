@@ -138,7 +138,15 @@ async function fetchPackedOrdersCount(workspaceId: string, range?: { from: strin
  * Aggregate dashboard stats using server-side COUNT queries.
  * Never loads full rows — safe for any dataset size.
  * Accepts an optional date range (from/to ISO strings) to scope
- * time-sensitive stats; totalOrders always counts all orders.
+ * time-sensitive stats; totalOrders and pendingOrders are always
+ * range-independent so they stay consistent across Dashboard / Packing / Progress.
+ *
+ * pendingOrders = COUNT(orders WHERE packing_status NOT IN done-states).
+ * This is the single source of truth consumed by:
+ *   - Dashboard KPI "Pending Orders"
+ *   - Packing page KPI "In Queue"
+ * Both pages call this same hook (with or without a range arg) and TanStack
+ * Query deduplicates the fetch, so they always show the same number.
  */
 export function useDashboardStats(range?: { from: string; to: string }) {
   const ws = useWorkspace();
@@ -147,73 +155,92 @@ export function useDashboardStats(range?: { from: string; to: string }) {
     queryKey: ["dashboard_stats", wid, range],
     enabled: !!wid,
     queryFn: async () => {
-      // Run all aggregate queries in parallel for speed
-      const [totalOrdersRes, packedOrders, shippedOrdersRes, totalReturnsRes, activePackersRes, activeUsersRes] =
-        await Promise.all([
-          // Total orders — always all orders, no date filter
-          db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
+      // Run all aggregate queries in parallel for speed.
+      const [
+        totalOrdersRes,
+        pendingOrdersRes,
+        packedOrders,
+        shippedOrdersRes,
+        totalReturnsRes,
+        activePackersRes,
+        activeUsersRes,
+      ] = await Promise.all([
+        // Total orders — all-time, never date-filtered.
+        // This never changes unless orders are deleted — "Total Orders" is
+        // intentionally stable so it acts as the denominator for progress.
+        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
 
-          // Packed orders — single source of truth, shared with
-          // usePackingProgress / Today's Packers (see fetchPackedOrdersCount).
-          fetchPackedOrdersCount(wid as string, range),
+        // Pending orders — orders not yet packed/shipped/delivered/cancelled/returned.
+        // Always all-time (no range filter) so it stays consistent with the
+        // Packing page's "In Queue" counter regardless of the date-range preset.
+        // Uses NOT IN the "done" statuses so new status values are pending by default.
+        db
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .not("packing_status", "in", '("packed","packed_with_missing","shipped","delivered","returned","cancelled")'),
 
-          // Shipped orders in range
-          (() => {
-            let q = db
-              .from("orders")
-              .select("id", { count: "exact", head: true })
-              .eq("workspace_id", wid)
-              .eq("packing_status", "shipped");
-            if (range) q = q.gte("updated_at", range.from).lte("updated_at", range.to);
-            return q;
-          })(),
+        // Packed orders — packing_records with status = 'Packed', scoped to range.
+        // Single source of truth shared with usePackingProgress / useTodayPackers
+        // (see fetchPackedOrdersCount). When no range is given (Packing page call),
+        // this counts all-time packed records.
+        fetchPackedOrdersCount(wid as string, range),
 
-          // Total returns in range
-          (() => {
-            let q = db.from("returns").select("id", { count: "exact", head: true }).eq("workspace_id", wid);
-            if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
-            return q;
-          })(),
+        // Shipped orders — scoped to range when provided.
+        (() => {
+          let q = db
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", wid)
+            .eq("packing_status", "shipped");
+          if (range) q = q.gte("updated_at", range.from).lte("updated_at", range.to);
+          return q;
+        })(),
 
-          // Active packers = distinct user_ids in packing_records in range
-          (() => {
-            let q = db
-              .from("packing_records")
-              .select("user_id", { count: "exact", head: false })
-              .eq("workspace_id", wid)
-              .neq("status", "Cancelled");
-            if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
-            return q;
-          })(),
+        // Total returns — scoped to range when provided.
+        (() => {
+          let q = db.from("returns").select("id", { count: "exact", head: true }).eq("workspace_id", wid);
+          if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
+          return q;
+        })(),
 
-          // Active users = distinct actors in audit_logs today
-          (() => {
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
-            return db
-              .from("audit_logs")
-              .select("actor_id", { count: "exact", head: false })
-              .eq("workspace_id", wid)
-              .gte("created_at", todayStart.toISOString())
-              .not("actor_id", "is", null);
-          })(),
-        ]);
+        // Active packers = distinct user_ids in packing_records in range.
+        (() => {
+          let q = db
+            .from("packing_records")
+            .select("user_id", { count: "exact", head: false })
+            .eq("workspace_id", wid)
+            .neq("status", "Cancelled");
+          if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
+          return q;
+        })(),
 
-      // Distinct active packers (deduplicate user_ids client-side from small result)
+        // Active users = distinct actors in audit_logs today (always today, not range).
+        (() => {
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          return db
+            .from("audit_logs")
+            .select("actor_id", { count: "exact", head: false })
+            .eq("workspace_id", wid)
+            .gte("created_at", todayStart.toISOString())
+            .not("actor_id", "is", null);
+        })(),
+      ]);
+
+      // Distinct active packers (deduplicate user_ids client-side from small result).
       const activePackers = new Set((activePackersRes.data ?? []).map((r: { user_id: string }) => r.user_id)).size;
 
-      // Distinct active users
+      // Distinct active users.
       const activeUsers = new Set((activeUsersRes.data ?? []).map((r: { actor_id: string }) => r.actor_id)).size;
 
-      const totalOrders = totalOrdersRes.count ?? 0;
-
       return {
-        totalOrders,
-        // Pending is always derived from the same totalOrders/packedOrders
-        // numbers shown elsewhere on the dashboard — never queried via a
-        // separate packing_status = 'pending' filter, so it can never
-        // drift out of sync with what's actually been packed.
-        pendingOrders: Math.max(0, totalOrders - packedOrders),
+        totalOrders: totalOrdersRes.count ?? 0,
+        // pendingOrders is now a direct DB COUNT of awaiting-packing orders —
+        // never derived from totalOrders minus a range-scoped packedOrders,
+        // so it stays in sync with Packing page "In Queue" regardless of the
+        // date-range preset selected on the Dashboard.
+        pendingOrders: pendingOrdersRes.count ?? 0,
         packedOrders,
         shippedOrders: shippedOrdersRes.count ?? 0,
         totalReturns: totalReturnsRes.count ?? 0,
