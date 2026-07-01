@@ -44,7 +44,7 @@ import {
   useWorkspaceMembers,
   useTodayPackers,
 } from "@/lib/use-warehouse-data";
-import { useDashboardStats, useImports, usePackingProgress } from "@/lib/use-orders-data";
+import { useDashboardStats, useImports, usePackingProgress, useOrderCounts } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
