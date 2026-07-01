@@ -44,7 +44,7 @@ import {
   useWorkspaceMembers,
   useTodayPackers,
 } from "@/lib/use-warehouse-data";
-import { useDashboardStats, useImports, usePackingProgress } from "@/lib/use-orders-data";
+import { useDashboardStats, useImports, usePackingProgress, useOrderCounts } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -90,6 +90,8 @@ function DashboardPage() {
 
   // Aggregate stats — no row limits, server-side COUNT queries
   const dashboardStats = useDashboardStats(range);
+  // Stable range-independent counts shared with the Packing page
+  const orderCounts = useOrderCounts();
 
   // Live Packing Progress widget — independent of the date-range preset above,
   // always reflects "today" per the business rules (Owner/Supervisor only).
@@ -135,6 +137,7 @@ function DashboardPage() {
         { event: "*", schema: "public", table: "orders", filter: `workspace_id=eq.${workspaceId}` },
         () => {
           qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -145,6 +148,7 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["order_items"] });
           qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -154,6 +158,7 @@ function DashboardPage() {
         { event: "*", schema: "public", table: "imports", filter: `workspace_id=eq.${workspaceId}` },
         () => {
           qc.invalidateQueries({ queryKey: ["imports"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -190,14 +195,14 @@ function DashboardPage() {
   const ret = returns.data ?? [];
   const mem = members.data ?? [];
 
-  const stats = dashboardStats.data ?? {
-    totalOrders: 0,
-    pendingOrders: 0,
-    packedOrders: 0,
-    shippedOrders: 0,
-    totalReturns: 0,
-    activePackers: 0,
-    activeUsers: 0,
+  const stats = {
+    totalOrders: orderCounts.data?.totalOrders ?? 0,
+    pendingOrders: orderCounts.data?.pendingOrders ?? 0,
+    packedOrders: dashboardStats.data?.packedOrders ?? 0,
+    shippedOrders: dashboardStats.data?.shippedOrders ?? 0,
+    totalReturns: dashboardStats.data?.totalReturns ?? 0,
+    activePackers: dashboardStats.data?.activePackers ?? 0,
+    activeUsers: dashboardStats.data?.activeUsers ?? 0,
   };
 
   const progress = packingProgress.data ?? {
