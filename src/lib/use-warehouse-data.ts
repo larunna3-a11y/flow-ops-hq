@@ -16,7 +16,6 @@ export type PackingRecord = {
   marketplace: string | null;
   courier: string | null;
   status: "Pending" | "Packed" | "Shipped" | "Cancelled";
-  notes?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -117,7 +116,8 @@ export function usePackingRecords(filters?: {
         .limit(2000);
       if (filters?.from) q = q.gte("created_at", filters.from);
       if (filters?.to) q = q.lte("created_at", filters.to);
-      if (filters?.marketplace && filters.marketplace !== "all") q = q.eq("marketplace", filters.marketplace);
+      if (filters?.marketplace && filters.marketplace !== "all")
+        q = q.eq("marketplace", filters.marketplace);
       if (filters?.courier && filters.courier !== "all") q = q.eq("courier", filters.courier);
       if (filters?.status && filters.status !== "all") q = q.eq("status", filters.status);
       if (filters?.userId && filters.userId !== "all") q = q.eq("user_id", filters.userId);
@@ -166,80 +166,9 @@ export function useAuditLogs(limit = 25) {
       if (ids.length) {
         const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
         const map = new Map((profs ?? []).map((p) => [p.id, p.full_name || p.email]));
-        for (const r of rows) r.actor_name = r.actor_id ? (map.get(r.actor_id) ?? null) : null;
+        for (const r of rows) r.actor_name = r.actor_id ? map.get(r.actor_id) ?? null : null;
       }
       return rows;
-    },
-  });
-}
-
-/**
- * "Today's Packers" widget (Owner/Supervisor dashboard only).
- * Aggregates today's packing_records client-side from a single scoped query
- * (created_at within today + status = 'Packed'), grouped by packer.
- * A packer is "Active" if their last scan was within the last 15 minutes.
- */
-export type TodayPacker = {
-  userId: string;
-  name: string;
-  packedOrders: number;
-  lastScanTime: string;
-  isActive: boolean;
-};
-
-const ACTIVE_WINDOW_MS = 15 * 60 * 1000;
-
-export function useTodayPackers() {
-  const ws = useWorkspace();
-  const workspaceId = ws.data?.workspace?.id;
-  return useQuery({
-    queryKey: ["today_packers", workspaceId],
-    enabled: !!workspaceId,
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const { data, error } = await supabase
-        .from("packing_records")
-        .select("user_id, user_name, status, scan_timestamp, created_at")
-        .eq("workspace_id", workspaceId!)
-        .eq("status", "Packed")
-        .gte("created_at", todayStart.toISOString())
-        .lte("created_at", todayEnd.toISOString())
-        .order("scan_timestamp", { ascending: false })
-        // High cap, not a realistic ceiling — keeps this exactly in sync with the
-        // unbounded COUNT() used for the Dashboard "Packed" KPI (usePackingProgress).
-        .limit(50000);
-      if (error) throw error;
-
-      const byUser = new Map<string, TodayPacker>();
-      for (const r of data ?? []) {
-        const scanTime = r.scan_timestamp ?? r.created_at;
-        const existing = byUser.get(r.user_id);
-        if (existing) {
-          existing.packedOrders += 1;
-          if (scanTime > existing.lastScanTime) existing.lastScanTime = scanTime;
-        } else {
-          byUser.set(r.user_id, {
-            userId: r.user_id,
-            name: r.user_name,
-            packedOrders: 1,
-            lastScanTime: scanTime,
-            isActive: false,
-          });
-        }
-      }
-
-      const now = Date.now();
-      const packers = Array.from(byUser.values()).map((p) => ({
-        ...p,
-        isActive: now - new Date(p.lastScanTime).getTime() <= ACTIVE_WINDOW_MS,
-      }));
-
-      return packers.sort((a, b) => b.packedOrders - a.packedOrders);
     },
   });
 }
@@ -276,3 +205,4 @@ export function useWorkspaceMembers() {
     },
   });
 }
+

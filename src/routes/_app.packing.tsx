@@ -541,9 +541,6 @@ function PackingPage() {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] });
-      qc.invalidateQueries({ queryKey: ["today_packers"] });
-      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
       qc.invalidateQueries({ queryKey: ["audit_logs"] });
       resetScan();
@@ -570,9 +567,6 @@ function PackingPage() {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] });
-      qc.invalidateQueries({ queryKey: ["today_packers"] });
-      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
     } finally {
       setDeleting(false);
       setDeleteTarget(null);

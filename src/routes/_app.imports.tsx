@@ -31,49 +31,6 @@ export const Route = createFileRoute("/_app/imports")({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-// Supabase/PostgREST `.in(col, [...])` filters are serialized into the
-// request URL as `col=in.(v1,v2,...)`. When an import batch contains a
-// large number of orders, passing every id/order_number/tracking_number
-// in a single `.in()` call can push the URL past the gateway's length
-// limit. When that happens the proxy in front of PostgREST rejects the
-// request before it ever reaches the database, returning a bare
-// `400 Bad Request` with no JSON body — which is why the resulting
-// error surfaces as just "Bad Request" with no further detail.
-//
-// To keep every `.in()`-based delete in the Import Batch deletion flow
-// safe regardless of batch size, we chunk the value list and issue
-// multiple smaller delete requests instead of one unbounded one.
-const DELETE_CHUNK_SIZE = 150;
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
- * Runs `db.from(table).delete().eq(workspace_id, wid).in(column, values)`
- * in chunks to avoid oversized request URLs. Returns the first error
- * encountered (if any) after attempting all chunks.
- */
-async function deleteInChunks(
-  table: string,
-  workspaceId: string,
-  column: string,
-  values: string[],
-): Promise<{ message: string } | null> {
-  if (!values.length) return null;
-  for (const chunk of chunkArray(values, DELETE_CHUNK_SIZE)) {
-    const { error } = await db.from(table).delete().eq("workspace_id", workspaceId).in(column, chunk);
-    if (error) {
-      return error;
-    }
-  }
-  return null;
-}
-
 function ImportsPage() {
   const { t } = useTranslation();
   const imports = useImports();
@@ -207,10 +164,9 @@ function ImportsPage() {
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
       qc.invalidateQueries({ queryKey: ["imports"] });
-      qc.invalidateQueries({ queryKey: ["order_counts"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] });
-      qc.invalidateQueries({ queryKey: ["packing_records"] });
+      qc.invalidateQueries({ queryKey: ["packing"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Import failed.");
     } finally {
@@ -230,18 +186,6 @@ function ImportsPage() {
    * which is the period in which confirmImport() inserts its rows. After
    * deletion the same Desty OMS file can be re-imported because the unique
    * (workspace_id, order_number) rows are gone.
-   *
-   * All deletions follow a strict order to respect foreign key constraints:
-   * 1. return_items (references returns + order_items)
-   * 2. return_timeline (references returns)
-   * 3. returns (references orders)
-   * 4. order_assignments (references orders)
-   * 5. packing_records (no FK to orders, matched by order_number/tracking_number)
-   * 6. order_items (references orders)
-   * 7. orders (the root)
-   * 8. imports (the batch record)
-   *
-   * RLS policies are checked at each step, so this respects workspace isolation.
    */
   async function deleteImport(id: string) {
     const wid = ws.data?.workspace?.id;
@@ -283,52 +227,53 @@ function ImportsPage() {
           .filter((n: string | null): n is string => !!n);
 
         if (orderIds.length) {
-          // Deletion order respects cascading foreign keys.
-          // All deletions must complete before the import batch record is deleted.
-
-          // 1) Related returns and their dependent rows (return_items, return_timeline).
-          //    These have FK references to orders, and must be deleted first.
-          //    Cascade relationships (return_items/return_timeline -> returns) are automatic.
-          const returnsErr = await deleteInChunks("returns", wid, "order_id", orderIds);
+          // 1) Related returns (and their dependent rows cascade via FK).
+          const { error: returnsErr } = await db
+            .from("returns")
+            .delete()
+            .eq("workspace_id", wid)
+            .in("order_id", orderIds);
           if (returnsErr) {
             toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
             return;
           }
 
-          // 2) Related order_assignments (references orders).
-          const assignmentsErr = await deleteInChunks("order_assignments", wid, "order_id", orderIds);
-          if (assignmentsErr) {
-            toast.error(`Couldn't delete order assignments: ${assignmentsErr.message}`);
-            return;
-          }
-
-          // 3) Related packing_records — matched by order_number OR tracking_number.
-          //    These have NO FK to orders, so they can be deleted at any point after orders are identified,
-          //    but deleting them here keeps all order-related data grouped together.
+          // 2) Related packing_records — matched by order_number OR tracking_number.
           if (orderNumbers.length) {
-            const prByNumberErr = await deleteInChunks("packing_records", wid, "order_number", orderNumbers);
+            const { error: prByNumberErr } = await db
+              .from("packing_records")
+              .delete()
+              .eq("workspace_id", wid)
+              .in("order_number", orderNumbers);
             if (prByNumberErr) {
               toast.error(`Couldn't delete packing records: ${prByNumberErr.message}`);
               return;
             }
           }
           if (trackingNumbers.length) {
-            const prByTrackingErr = await deleteInChunks("packing_records", wid, "tracking_number", trackingNumbers);
+            const { error: prByTrackingErr } = await db
+              .from("packing_records")
+              .delete()
+              .eq("workspace_id", wid)
+              .in("tracking_number", trackingNumbers);
             if (prByTrackingErr) {
               toast.error(`Couldn't delete packing records: ${prByTrackingErr.message}`);
               return;
             }
           }
 
-          // 4) Order items (references orders via FK).
-          const itemsErr = await deleteInChunks("order_items", wid, "order_id", orderIds);
+          // 3) Order items, then orders (FK order).
+          const { error: itemsErr } = await db
+            .from("order_items")
+            .delete()
+            .eq("workspace_id", wid)
+            .in("order_id", orderIds);
           if (itemsErr) {
             toast.error(`Couldn't delete order items: ${itemsErr.message}`);
             return;
           }
 
-          // 5) Orders (the root).
-          const ordersErr = await deleteInChunks("orders", wid, "id", orderIds);
+          const { error: ordersErr } = await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
           if (ordersErr) {
             toast.error(`Couldn't delete orders: ${ordersErr.message}`);
             return;
@@ -336,7 +281,7 @@ function ImportsPage() {
         }
       }
 
-      // 6) Finally delete the import history row.
+      // 4) Finally delete the import history row.
       const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
       if (error) {
         toast.error(error.message);
@@ -344,20 +289,14 @@ function ImportsPage() {
       }
 
       toast.success("Imported batch and all related data deleted.");
-
-      // Invalidate all affected queries across Dashboard, Packing, Reports, and Orders pages.
-      // This ensures all pages refresh to reflect the deleted data.
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
-      qc.invalidateQueries({ queryKey: ["order_counts"] });
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["returns"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] });
-      qc.invalidateQueries({ queryKey: ["today_packers"] });
-      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
-      qc.invalidateQueries({ queryKey: ["audit_logs"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reports"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Delete failed.");
     } finally {
