@@ -27,10 +27,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { useStores, useImports, MARKETPLACES, COURIERS, type Store } from "@/lib/use-orders-data";
+import {
+  useStores,
+  useImports,
+  MARKETPLACES,
+  COURIERS,
+  type Store,
+} from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { logActivity } from "@/lib/activity.functions";
 import { notify } from "@/lib/notify";
@@ -41,7 +60,8 @@ export const Route = createFileRoute("/_app/integrations")({
       { title: "Integrations — FlowOps" },
       {
         name: "description",
-        content: "Central place to manage marketplace integrations and import orders into FlowOps.",
+        content:
+          "Central place to manage marketplace integrations and import orders into FlowOps.",
       },
     ],
   }),
@@ -83,10 +103,7 @@ const FIELD_ALIASES: Record<keyof Omit<ImportRow, "__issues" | "__duplicate">, s
 };
 
 function matchField(header: string): keyof typeof FIELD_ALIASES | null {
-  const h = header
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s-]+/g, " ");
+  const h = header.trim().toLowerCase().replace(/[_\s-]+/g, " ");
   for (const [field, aliases] of Object.entries(FIELD_ALIASES)) {
     if (aliases.some((a) => a === h)) return field as keyof typeof FIELD_ALIASES;
   }
@@ -146,11 +163,12 @@ function IntegrationsPage() {
     if (!isOwner) return;
     const targets = byMarketplace.get(mp) ?? [];
     for (const s of targets) {
-      await db.from("stores").update({ connection_status: "disconnected", last_sync_at: null }).eq("id", s.id);
+      await db
+        .from("stores")
+        .update({ connection_status: "disconnected", last_sync_at: null })
+        .eq("id", s.id);
     }
-    await log({ data: { action: "integration.disconnected", target_type: "marketplace", target_id: mp } }).catch(
-      () => {},
-    );
+    await log({ data: { action: "integration.disconnected", target_type: "marketplace", target_id: mp } }).catch(() => {});
     toast.success(`${mp} disconnected`);
     qc.invalidateQueries({ queryKey: ["stores"] });
   };
@@ -159,7 +177,10 @@ function IntegrationsPage() {
     const targets = byMarketplace.get(mp) ?? [];
     if (!targets.length) return toast.error("No stores configured for this marketplace yet.");
     for (const s of targets) {
-      await db.from("stores").update({ last_sync_at: new Date().toISOString() }).eq("id", s.id);
+      await db
+        .from("stores")
+        .update({ last_sync_at: new Date().toISOString() })
+        .eq("id", s.id);
     }
     await log({ data: { action: "integration.synced", target_type: "marketplace", target_id: mp } }).catch(() => {});
     toast.success(`${mp} sync queued`);
@@ -195,7 +216,9 @@ function IntegrationsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">{mp}</div>
-                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xs">{MARKETPLACE_DESCRIPTIONS[mp]}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 max-w-xs">
+                      {MARKETPLACE_DESCRIPTIONS[mp]}
+                    </p>
                   </div>
                   <StatusPill tone={statusToTone(connected ? "active" : "pending")}>
                     {connected ? "Connected" : "Not Connected"}
@@ -210,11 +233,15 @@ function IntegrationsPage() {
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Sync status</dt>
-                    <dd className="font-medium capitalize">{items[0]?.connection_status ?? "—"}</dd>
+                    <dd className="font-medium capitalize">
+                      {items[0]?.connection_status ?? "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Last sync</dt>
-                    <dd className="font-medium">{lastSync ? new Date(lastSync).toLocaleString() : "—"}</dd>
+                    <dd className="font-medium">
+                      {lastSync ? new Date(lastSync).toLocaleString() : "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Last import</dt>
@@ -269,9 +296,9 @@ function IntegrationsPage() {
           <div>
             <div className="text-sm font-semibold">Automatic API sync — Coming Soon</div>
             <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-              FlowOps is ready for marketplace API connections. Once enabled, orders will sync automatically from
-              Shopee, TikTok Shop, Tokopedia, Lazada and Blibli without manual imports. The Order Management module will
-              continue working unchanged.
+              FlowOps is ready for marketplace API connections. Once enabled, orders will sync
+              automatically from Shopee, TikTok Shop, Tokopedia, Lazada and Blibli without manual
+              imports. The Order Management module will continue working unchanged.
             </p>
             <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
               <CheckCircle2 className="h-3 w-3" /> Ready for API connection
@@ -330,8 +357,8 @@ function IntegrationsPage() {
           <DialogHeader>
             <DialogTitle>Configure {configureMp}</DialogTitle>
             <DialogDescription>
-              Account information and sync preferences. API credential fields will be enabled once the marketplace API
-              integration is released.
+              Account information and sync preferences. API credential fields will be enabled once
+              the marketplace API integration is released.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -346,9 +373,7 @@ function IntegrationsPage() {
             <div className="space-y-1.5">
               <Label>Sync frequency (coming soon)</Label>
               <Select disabled>
-                <SelectTrigger>
-                  <SelectValue placeholder="Every 15 minutes" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Every 15 minutes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="15m">Every 15 minutes</SelectItem>
                 </SelectContent>
@@ -356,9 +381,7 @@ function IntegrationsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfigureMp(null)}>
-              Close
-            </Button>
+            <Button variant="outline" onClick={() => setConfigureMp(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -415,7 +438,11 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
       }
       // Pre-fetch existing order numbers for duplicate detection.
       const candidateOrderNumbers = Array.from(
-        new Set(raw.map((r) => String((map.order_number ? r[map.order_number] : "") ?? "").trim()).filter(Boolean)),
+        new Set(
+          raw
+            .map((r) => String((map.order_number ? r[map.order_number] : "") ?? "").trim())
+            .filter(Boolean),
+        ),
       );
       let existing = new Set<string>();
       if (wid && candidateOrderNumbers.length) {
@@ -428,7 +455,8 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
       }
       const seenInFile = new Set<string>();
       const parsed: ImportRow[] = raw.map((r) => {
-        const get = (k: keyof typeof FIELD_ALIASES) => (map[k] ? String(r[map[k] as string] ?? "").trim() : "");
+        const get = (k: keyof typeof FIELD_ALIASES) =>
+          map[k] ? String(r[map[k] as string] ?? "").trim() : "";
         const qtyRaw = get("quantity");
         const quantity = Number(qtyRaw) || 0;
         const row: ImportRow = {
@@ -444,8 +472,10 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
         if (!row.order_number) row.__issues.push("Missing order number");
         if (!row.tracking_number) row.__issues.push("Missing tracking");
         if (!row.sku) row.__issues.push("Missing SKU");
-        if (row.marketplace && !validMarketplaces.has(row.marketplace)) row.__issues.push("Invalid marketplace");
-        if (row.courier && !validCouriers.has(row.courier)) row.__issues.push("Unknown courier");
+        if (row.marketplace && !validMarketplaces.has(row.marketplace))
+          row.__issues.push("Invalid marketplace");
+        if (row.courier && !validCouriers.has(row.courier))
+          row.__issues.push("Unknown courier");
         if (row.order_number) {
           if (existing.has(row.order_number) || seenInFile.has(row.order_number)) {
             row.__duplicate = true;
@@ -486,7 +516,7 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
           courier: head.courier || null,
           customer_name: head.customer_name || null,
           order_status: "new",
-          packing_status: "pending",
+          packing_status: "new",
           shipping_status: "pending",
           ordered_at: new Date().toISOString(),
         })
@@ -563,8 +593,8 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
           <div>
             <div className="text-sm font-medium">Upload CSV or Excel (.xlsx)</div>
             <p className="text-xs text-muted-foreground mt-1 max-w-lg">
-              Headers are mapped automatically (order number, tracking, marketplace, courier, customer, SKU, quantity).
-              Preview and validation runs before anything is saved.
+              Headers are mapped automatically (order number, tracking, marketplace, courier,
+              customer, SKU, quantity). Preview and validation runs before anything is saved.
             </p>
           </div>
           <div className="flex gap-2">
@@ -622,10 +652,7 @@ function ManualImportSection({ onDone }: { onDone: () => void }) {
                 </TableHeader>
                 <TableBody>
                   {rows.slice(0, 200).map((r, i) => (
-                    <TableRow
-                      key={i}
-                      className={r.__duplicate ? "bg-warning/5" : r.__issues.length ? "bg-destructive/5" : ""}
-                    >
+                    <TableRow key={i} className={r.__duplicate ? "bg-warning/5" : r.__issues.length ? "bg-destructive/5" : ""}>
                       <TableCell className="font-mono text-xs">{r.order_number || "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{r.tracking_number || "—"}</TableCell>
                       <TableCell className="text-xs">{r.marketplace || "—"}</TableCell>

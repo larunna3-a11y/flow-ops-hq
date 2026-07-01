@@ -82,22 +82,6 @@ export type DashboardStats = {
   activeUsers: number;
 };
 
-// --- Packing Progress (live, Owner/Supervisor dashboard widget) ---
-export type PackingProgressStats = {
-  todayOrders: number;
-  pendingOrders: number;
-  packedOrders: number;
-  packingProgress: number; // 0-100
-};
-
-export type TodayPacker = {
-  userId: string;
-  name: string;
-  packedOrders: number;
-  lastScanTime: string;
-  isActive: boolean;
-};
-
 export function useStores() {
   const ws = useWorkspace();
   const wid = ws.data?.workspace?.id;
@@ -217,65 +201,6 @@ export function useDashboardStats(range?: { from: string; to: string }) {
         activePackers,
         activeUsers,
       } as DashboardStats;
-    },
-  });
-}
-
-/**
- * Live "Packing Progress" widget stats for the Dashboard (Owner/Supervisor only).
- * All counts use server-side COUNT(head: true) aggregate queries — never loads
- * full row sets — so this stays cheap on large datasets.
- *
- * Business rules:
- * - todayOrders   = orders imported (created_at) today only. Resets automatically
- *                   at local midnight since it's derived from "now" on every fetch;
- *                   historical orders are never deleted or modified.
- * - pendingOrders = ALL orders with packing_status = 'pending', regardless of the
- *                   day they were imported (carries over unfinished work).
- * - packedOrders  = ALL orders with packing_status = 'packed' (all-time).
- * - packingProgress = packedOrders / todayOrders * 100 (capped at 100, 0 when no
- *                   orders were imported today).
- */
-export function usePackingProgress() {
-  const ws = useWorkspace();
-  const wid = ws.data?.workspace?.id;
-  return useQuery({
-    queryKey: ["packing_progress", wid],
-    enabled: !!wid,
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const [todayOrdersRes, pendingOrdersRes, packedOrdersRes] = await Promise.all([
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .gte("created_at", todayStart.toISOString())
-          .lte("created_at", todayEnd.toISOString()),
-
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .eq("packing_status", "pending"),
-
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .eq("packing_status", "packed"),
-      ]);
-
-      const todayOrders = todayOrdersRes.count ?? 0;
-      const pendingOrders = pendingOrdersRes.count ?? 0;
-      const packedOrders = packedOrdersRes.count ?? 0;
-      const packingProgress = todayOrders > 0 ? Math.min(100, Math.round((packedOrders / todayOrders) * 1000) / 10) : 0;
-
-      return { todayOrders, pendingOrders, packedOrders, packingProgress } as PackingProgressStats;
     },
   });
 }

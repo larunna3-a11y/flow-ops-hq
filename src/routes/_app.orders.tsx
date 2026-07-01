@@ -10,12 +10,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusPill, statusToTone } from "@/components/status-pill";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
-import { MARKETPLACES, PACKING_STATUSES, useOrders, useOrderItems, useStores, type Order } from "@/lib/use-orders-data";
+import {
+  MARKETPLACES,
+  PACKING_STATUSES,
+  useOrders,
+  useOrderItems,
+  useStores,
+  type Order,
+} from "@/lib/use-orders-data";
 import { useWorkspaceMembers } from "@/lib/use-warehouse-data";
 import { notify } from "@/lib/notify";
 
@@ -63,7 +82,10 @@ function OrdersPage() {
   const [importFileName, setImportFileName] = useState("");
   const [importMapping, setImportMapping] = useState<Record<string, string>>({});
   const [importing, setImporting] = useState(false);
-  const sourceColumns = useMemo(() => (importRows[0] ? Object.keys(importRows[0]) : []), [importRows]);
+  const sourceColumns = useMemo(
+    () => (importRows[0] ? Object.keys(importRows[0]) : []),
+    [importRows],
+  );
 
   const assign = async () => {
     if (!detail || !assignTo || !wid) return;
@@ -124,9 +146,8 @@ function OrdersPage() {
     const cols = Object.keys(rows[0]);
     const mapping: Record<string, string> = {};
     for (const key of COLUMN_KEYS) {
-      const match =
-        cols.find((c) => c.toLowerCase().replace(/[^a-z]/g, "") === key.replace(/_/g, "")) ??
-        cols.find((c) => c.toLowerCase().includes(key.split("_")[0]));
+      const match = cols.find((c) => c.toLowerCase().replace(/[^a-z]/g, "") === key.replace(/_/g, ""))
+        ?? cols.find((c) => c.toLowerCase().includes(key.split("_")[0]));
       if (match) mapping[key] = match;
     }
     setImportMapping(mapping);
@@ -139,19 +160,17 @@ function OrdersPage() {
     setImporting(true);
 
     // Build candidates
-    const candidates = importRows
-      .map((row) => {
-        const obj: Record<string, unknown> = { workspace_id: wid };
-        for (const key of COLUMN_KEYS) {
-          const src = importMapping[key];
-          if (src) obj[key] = String(row[src] ?? "").trim();
-        }
-        obj.packing_status = "pending";
-        obj.order_status = "new";
-        obj.shipping_status = "Pending";
-        return obj;
-      })
-      .filter((r) => r.order_number);
+    const candidates = importRows.map((row) => {
+      const obj: Record<string, unknown> = { workspace_id: wid };
+      for (const key of COLUMN_KEYS) {
+        const src = importMapping[key];
+        if (src) obj[key] = String(row[src] ?? "").trim();
+      }
+      obj.packing_status = "new";
+      obj.order_status = "new";
+      obj.shipping_status = "Pending";
+      return obj;
+    }).filter((r) => r.order_number);
 
     // Check for duplicates against existing orders in workspace
     const numbers = candidates.map((c) => c.order_number as string);
@@ -215,11 +234,7 @@ function OrdersPage() {
       if (insErr) {
         failed = toInsert.length;
         success = 0;
-        for (const l of logs)
-          if (l.status === "success") {
-            l.status = "failed";
-            l.message = insErr.message;
-          }
+        for (const l of logs) if (l.status === "success") { l.status = "failed"; l.message = insErr.message; }
       } else {
         success = toInsert.length;
       }
@@ -239,7 +254,9 @@ function OrdersPage() {
     setImporting(false);
     setImportOpen(false);
     setImportRows([]);
-    toast.success(t("orders.import.done", { success, duplicates, failed }));
+    toast.success(
+      t("orders.import.done", { success, duplicates, failed }),
+    );
     qc.invalidateQueries({ queryKey: ["orders"] });
     qc.invalidateQueries({ queryKey: ["imports"] });
   };
@@ -274,50 +291,27 @@ function OrdersPage() {
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            className="pl-8"
-            placeholder={t("orders.searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input className="pl-8" placeholder={t("orders.searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={marketplace} onValueChange={setMarketplace}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("orders.filters.allMarketplaces")}</SelectItem>
-            {MARKETPLACES.map((m) => (
-              <SelectItem key={m} value={m}>
-                {m}
-              </SelectItem>
-            ))}
+            {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={store} onValueChange={setStore}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("orders.filters.allStores")}</SelectItem>
-            {(stores.data ?? []).map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.name}
-              </SelectItem>
-            ))}
+            {(stores.data ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("orders.filters.allStatuses")}</SelectItem>
-            {PACKING_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {t(`orders.status.${s}`)}
-              </SelectItem>
-            ))}
+            {PACKING_STATUSES.map((s) => <SelectItem key={s} value={s}>{t(`orders.status.${s}`)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -347,14 +341,10 @@ function OrdersPage() {
                 <TableCell className="font-mono text-xs">{o.tracking_number ?? "—"}</TableCell>
                 <TableCell>{o.courier ?? "—"}</TableCell>
                 <TableCell>
-                  <StatusPill tone={statusToTone(o.packing_status)}>
-                    {t(`orders.status.${o.packing_status}`)}
-                  </StatusPill>
+                  <StatusPill tone={statusToTone(o.packing_status)}>{t(`orders.status.${o.packing_status}`)}</StatusPill>
                 </TableCell>
                 <TableCell className="text-xs">{o.assigned_to_name ?? t("common.unassigned")}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {new Date(o.created_at).toLocaleString()}
-                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{new Date(o.created_at).toLocaleString()}</TableCell>
               </TableRow>
             ))}
             {!(orders.data ?? []).length && (
@@ -369,12 +359,7 @@ function OrdersPage() {
       </div>
 
       {/* Detail dialog */}
-      <Dialog
-        open={!!detail}
-        onOpenChange={(o) => {
-          if (!o) setDetail(null);
-        }}
-      >
+      <Dialog open={!!detail} onOpenChange={(o) => { if (!o) setDetail(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{detail?.order_number}</DialogTitle>
@@ -382,54 +367,24 @@ function OrdersPage() {
           {detail && (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.marketplace")}</div>
-                  <div>{detail.marketplace ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.store")}</div>
-                  <div>{detail.store_name ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.customer")}</div>
-                  <div>
-                    {detail.customer_name ?? "—"}
-                    {detail.customer_phone ? ` · ${detail.customer_phone}` : ""}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.courier")}</div>
-                  <div>{detail.courier ?? "—"}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.tracking")}</div>
-                  <div className="font-mono">{detail.tracking_number ?? "—"}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.packing")}</div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.marketplace")}</div><div>{detail.marketplace ?? "—"}</div></div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.store")}</div><div>{detail.store_name ?? "—"}</div></div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.customer")}</div><div>{detail.customer_name ?? "—"}{detail.customer_phone ? ` · ${detail.customer_phone}` : ""}</div></div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.courier")}</div><div>{detail.courier ?? "—"}</div></div>
+                <div className="col-span-2"><div className="text-xs text-muted-foreground">{t("orders.columns.tracking")}</div><div className="font-mono">{detail.tracking_number ?? "—"}</div></div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.packing")}</div>
                   {isManager || detail.assigned_to === ws.data?.userId ? (
                     <Select value={detail.packing_status} onValueChange={(v) => updateStatus(detail, v)}>
-                      <SelectTrigger className="h-8 mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger className="h-8 mt-1"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {PACKING_STATUSES.map((s) => (
-                          <SelectItem key={s} value={s}>
-                            {t(`orders.status.${s}`)}
-                          </SelectItem>
-                        ))}
+                        {PACKING_STATUSES.map((s) => <SelectItem key={s} value={s}>{t(`orders.status.${s}`)}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <StatusPill tone={statusToTone(detail.packing_status)}>
-                      {t(`orders.status.${detail.packing_status}`)}
-                    </StatusPill>
+                    <StatusPill tone={statusToTone(detail.packing_status)}>{t(`orders.status.${detail.packing_status}`)}</StatusPill>
                   )}
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">{t("orders.columns.assigned")}</div>
-                  <div>{detail.assigned_to_name ?? t("common.unassigned")}</div>
-                </div>
+                <div><div className="text-xs text-muted-foreground">{t("orders.columns.assigned")}</div><div>{detail.assigned_to_name ?? t("common.unassigned")}</div></div>
               </div>
 
               <div className="border-t pt-3">
@@ -462,20 +417,15 @@ function OrdersPage() {
                 )}
               </div>
 
+
               {isManager && (
                 <div className="space-y-1.5 border-t pt-3">
                   <Label>{t("orders.assign.label")}</Label>
                   <div className="flex gap-2">
                     <Select value={assignTo} onValueChange={setAssignTo}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("orders.assign.placeholder")} />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("orders.assign.placeholder")} /></SelectTrigger>
                       <SelectContent>
-                        {(members.data ?? []).map((m) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name}
-                          </SelectItem>
-                        ))}
+                        {(members.data ?? []).map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <Button onClick={assign} disabled={!assignTo}>
@@ -496,30 +446,15 @@ function OrdersPage() {
             <DialogTitle>{t("orders.import.title")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p className="text-xs text-muted-foreground">
-              {t("orders.import.description", { count: importRows.length, name: importFileName })}
-            </p>
+            <p className="text-xs text-muted-foreground">{t("orders.import.description", { count: importRows.length, name: importFileName })}</p>
             <div className="grid grid-cols-2 gap-3">
               {COLUMN_KEYS.map((key) => (
                 <div key={key} className="space-y-1.5">
-                  <Label>
-                    {t(
-                      `orders.columns.${key === "order_number" ? "order" : key === "store_name" ? "store" : key === "customer_name" ? "customer" : key === "tracking_number" ? "tracking" : key}`,
-                    )}
-                  </Label>
-                  <Select
-                    value={importMapping[key] ?? ""}
-                    onValueChange={(v) => setImportMapping({ ...importMapping, [key]: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
+                  <Label>{t(`orders.columns.${key === "order_number" ? "order" : key === "store_name" ? "store" : key === "customer_name" ? "customer" : key === "tracking_number" ? "tracking" : key}`)}</Label>
+                  <Select value={importMapping[key] ?? ""} onValueChange={(v) => setImportMapping({ ...importMapping, [key]: v })}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
-                      {sourceColumns.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
+                      {sourceColumns.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -527,12 +462,8 @@ function OrdersPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setImportOpen(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={runImport} disabled={importing}>
-              {importing ? t("common.sending") : t("orders.import.run")}
-            </Button>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>{t("common.cancel")}</Button>
+            <Button onClick={runImport} disabled={importing}>{importing ? t("common.sending") : t("orders.import.run")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
