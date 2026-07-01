@@ -768,8 +768,12 @@ function ReturnInspectionSheet({
       });
     }
     qc.invalidateQueries({ queryKey: ["returns"] });
+    qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    qc.invalidateQueries({ queryKey: ["reports"] });
     toast.success("Inspection saved");
   }
+
 
   const discrepancies = (items.data ?? []).filter(
     (i) =>
