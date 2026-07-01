@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusPill, statusToTone } from "@/components/status-pill";
@@ -10,6 +11,7 @@ import { useImports } from "@/lib/use-orders-data";
 import { useWorkspace, useCurrentUser } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { parseDestyFile, type DestyParseResult } from "@/lib/desty-parser";
+import { deleteImportBatch } from "@/lib/imports.functions";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import {
@@ -31,48 +33,6 @@ export const Route = createFileRoute("/_app/imports")({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-// Supabase/PostgREST `.in(col, [...])` filters are serialized into the
-// request URL as `col=in.(v1,v2,...)`. When an import batch contains a
-// large number of orders, passing every id/order_number/tracking_number
-// in a single `.in()` call can push the URL past the gateway's length
-// limit. When that happens the proxy in front of PostgREST rejects the
-// request before it ever reaches the database, returning a bare
-// `400 Bad Request` with no JSON body — which is why the resulting
-// error surfaces as just "Bad Request" with no further detail.
-//
-// To keep every `.in()`-based delete in the Import Batch deletion flow
-// safe regardless of batch size, we chunk the value list and issue
-// multiple smaller delete requests instead of one unbounded one.
-const DELETE_CHUNK_SIZE = 150;
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
- * Runs `db.from(table).delete().eq(workspace_id, wid).in(column, values)`
- * in chunks to avoid oversized request URLs. Returns the first error
- * encountered (if any) after attempting all chunks.
- */
-async function deleteInChunks(
-  table: string,
-  workspaceId: string,
-  column: string,
-  values: string[],
-): Promise<{ message: string } | null> {
-  if (!values.length) return null;
-  for (const chunk of chunkArray(values, DELETE_CHUNK_SIZE)) {
-    const { error } = await db.from(table).delete().eq("workspace_id", workspaceId).in(column, chunk);
-    if (error) {
-      return error;
-    }
-  }
-  return null;
-}
 
 function ImportsPage() {
   const { t } = useTranslation();
