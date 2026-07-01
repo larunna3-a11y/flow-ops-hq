@@ -142,7 +142,7 @@ export function useReturns() {
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      return (data ?? []) as unknown as ReturnRecord[];
+      return (data ?? []) as ReturnRecord[];
     },
   });
 }
