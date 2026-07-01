@@ -100,6 +100,8 @@ function OrdersPage() {
     });
     toast.success(t("orders.toast.assigned", { name: member.name }));
     qc.invalidateQueries({ queryKey: ["orders"] });
+    qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+    qc.invalidateQueries({ queryKey: ["packing_progress"] });
     setDetail(null);
     setAssignTo("");
   };
@@ -109,6 +111,8 @@ function OrdersPage() {
     if (error) return toast.error(error.message);
     toast.success(t("orders.toast.statusUpdated"));
     qc.invalidateQueries({ queryKey: ["orders"] });
+    qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+    qc.invalidateQueries({ queryKey: ["packing_progress"] });
     if (detail?.id === order.id) setDetail({ ...order, packing_status: next });
   };
 
@@ -242,6 +246,8 @@ function OrdersPage() {
     toast.success(t("orders.import.done", { success, duplicates, failed }));
     qc.invalidateQueries({ queryKey: ["orders"] });
     qc.invalidateQueries({ queryKey: ["imports"] });
+    qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+    qc.invalidateQueries({ queryKey: ["packing_progress"] });
   };
 
   return (
