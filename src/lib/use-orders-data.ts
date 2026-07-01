@@ -72,9 +72,12 @@ export type ImportBatch = {
   created_at: string;
 };
 
-export type DashboardStats = {
+export type OrderCounts = {
   totalOrders: number;
   pendingOrders: number;
+};
+
+export type DashboardStats = {
   packedOrders: number;
   shippedOrders: number;
   totalReturns: number;
@@ -135,18 +138,49 @@ async function fetchPackedOrdersCount(workspaceId: string, range?: { from: strin
 }
 
 /**
+ * Range-independent order counts — the single shared cache entry for
+ * "Total Orders" and "Pending Orders" consumed by BOTH:
+ *   - Dashboard KPI cards ("Total Orders", "Pending Orders")
+ *   - Packing page KPI tiles ("Total Orders", "In Queue")
+ *
+ * Key is ["order_counts", wid] — never includes a range — so no matter
+ * what date preset the Dashboard has selected, this entry is identical
+ * to what the Packing page reads. Invalidating ["order_counts"] from
+ * either page refreshes both simultaneously.
+ *
+ * pendingOrders = COUNT(orders NOT IN done-states) — a direct DB query,
+ * never derived from totalOrders minus a range-scoped packed count.
+ */
+export function useOrderCounts() {
+  const ws = useWorkspace();
+  const wid = ws.data?.workspace?.id;
+  return useQuery({
+    queryKey: ["order_counts", wid],
+    enabled: !!wid,
+    queryFn: async () => {
+      const [totalRes, pendingRes] = await Promise.all([
+        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
+        db
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .not("packing_status", "in", '("packed","packed_with_missing","shipped","delivered","returned","cancelled")'),
+      ]);
+      return {
+        totalOrders: totalRes.count ?? 0,
+        pendingOrders: pendingRes.count ?? 0,
+      };
+    },
+  });
+}
+
+/**
  * Aggregate dashboard stats using server-side COUNT queries.
  * Never loads full rows — safe for any dataset size.
- * Accepts an optional date range (from/to ISO strings) to scope
- * time-sensitive stats; totalOrders and pendingOrders are always
- * range-independent so they stay consistent across Dashboard / Packing / Progress.
- *
- * pendingOrders = COUNT(orders WHERE packing_status NOT IN done-states).
- * This is the single source of truth consumed by:
- *   - Dashboard KPI "Pending Orders"
- *   - Packing page KPI "In Queue"
- * Both pages call this same hook (with or without a range arg) and TanStack
- * Query deduplicates the fetch, so they always show the same number.
+ * Accepts a date range to scope time-sensitive stats (packed, shipped,
+ * returns, active packers). totalOrders and pendingOrders are NOT included
+ * here — they live in useOrderCounts() with a stable range-free key so
+ * both Dashboard and Packing page always share one cache entry for those.
  */
 export function useDashboardStats(range?: { from: string; to: string }) {
   const ws = useWorkspace();
@@ -156,34 +190,9 @@ export function useDashboardStats(range?: { from: string; to: string }) {
     enabled: !!wid,
     queryFn: async () => {
       // Run all aggregate queries in parallel for speed.
-      const [
-        totalOrdersRes,
-        pendingOrdersRes,
-        packedOrders,
-        shippedOrdersRes,
-        totalReturnsRes,
-        activePackersRes,
-        activeUsersRes,
-      ] = await Promise.all([
-        // Total orders — all-time, never date-filtered.
-        // This never changes unless orders are deleted — "Total Orders" is
-        // intentionally stable so it acts as the denominator for progress.
-        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
-
-        // Pending orders — orders not yet packed/shipped/delivered/cancelled/returned.
-        // Always all-time (no range filter) so it stays consistent with the
-        // Packing page's "In Queue" counter regardless of the date-range preset.
-        // Uses NOT IN the "done" statuses so new status values are pending by default.
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .not("packing_status", "in", '("packed","packed_with_missing","shipped","delivered","returned","cancelled")'),
-
+      const [packedOrders, shippedOrdersRes, totalReturnsRes, activePackersRes, activeUsersRes] = await Promise.all([
         // Packed orders — packing_records with status = 'Packed', scoped to range.
-        // Single source of truth shared with usePackingProgress / useTodayPackers
-        // (see fetchPackedOrdersCount). When no range is given (Packing page call),
-        // this counts all-time packed records.
+        // Single source of truth shared with usePackingProgress / useTodayPackers.
         fetchPackedOrdersCount(wid as string, range),
 
         // Shipped orders — scoped to range when provided.
@@ -235,18 +244,12 @@ export function useDashboardStats(range?: { from: string; to: string }) {
       const activeUsers = new Set((activeUsersRes.data ?? []).map((r: { actor_id: string }) => r.actor_id)).size;
 
       return {
-        totalOrders: totalOrdersRes.count ?? 0,
-        // pendingOrders is now a direct DB COUNT of awaiting-packing orders —
-        // never derived from totalOrders minus a range-scoped packedOrders,
-        // so it stays in sync with Packing page "In Queue" regardless of the
-        // date-range preset selected on the Dashboard.
-        pendingOrders: pendingOrdersRes.count ?? 0,
         packedOrders,
         shippedOrders: shippedOrdersRes.count ?? 0,
         totalReturns: totalReturnsRes.count ?? 0,
         activePackers,
         activeUsers,
-      } as DashboardStats;
+      };
     },
   });
 }
