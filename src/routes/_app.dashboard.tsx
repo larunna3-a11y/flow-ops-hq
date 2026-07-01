@@ -25,6 +25,8 @@ import {
   Users,
   UserCheck,
   ShoppingCart,
+  Activity,
+  Radio,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -32,10 +34,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusPill, statusToTone } from "@/components/status-pill";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usePackingRecords, useReturns, useAuditLogs, useWorkspaceMembers } from "@/lib/use-warehouse-data";
-import { useDashboardStats, useImports } from "@/lib/use-orders-data";
+import {
+  usePackingRecords,
+  useReturns,
+  useAuditLogs,
+  useWorkspaceMembers,
+  useTodayPackers,
+} from "@/lib/use-warehouse-data";
+import { useDashboardStats, useImports, usePackingProgress } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -82,6 +91,12 @@ function DashboardPage() {
   // Aggregate stats — no row limits, server-side COUNT queries
   const dashboardStats = useDashboardStats(range);
 
+  // Live Packing Progress widget — independent of the date-range preset above,
+  // always reflects "today" per the business rules (Owner/Supervisor only).
+  const isOwnerOrSupervisor = ws.data?.role === "Owner" || ws.data?.role === "Supervisor";
+  const packingProgress = usePackingProgress();
+  const todayPackers = useTodayPackers();
+
   // These are still used for charts only (not KPI cards)
   const records = usePackingRecords({ from: range.from, to: range.to });
   const recordsAll = usePackingRecords();
@@ -102,6 +117,8 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["packing_records"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+          qc.invalidateQueries({ queryKey: ["packing_progress"] });
+          qc.invalidateQueries({ queryKey: ["today_packers"] });
         },
       )
       .on(
@@ -110,6 +127,7 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["returns"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+          qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
       )
       .on(
@@ -118,6 +136,7 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["orders"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+          qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
       )
       .on(
@@ -127,6 +146,7 @@ function DashboardPage() {
           qc.invalidateQueries({ queryKey: ["order_items"] });
           qc.invalidateQueries({ queryKey: ["orders"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+          qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
       )
       .on(
@@ -135,6 +155,7 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["imports"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+          qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
       )
       .on(
@@ -178,6 +199,14 @@ function DashboardPage() {
     activePackers: 0,
     activeUsers: 0,
   };
+
+  const progress = packingProgress.data ?? {
+    todayOrders: 0,
+    pendingOrders: 0,
+    packedOrders: 0,
+    packingProgress: 0,
+  };
+  const packers = todayPackers.data ?? [];
 
   const roleSummary = useMemo(() => {
     const counts: Record<string, number> = { Owner: 0, Supervisor: 0, Packer: 0, "Return Staff": 0 };
@@ -292,7 +321,13 @@ function DashboardPage() {
         }
       />
 
-      {/* Single KPI row — aggregate queries, no row limits */}
+      {/* Single KPI row — aggregate queries, no row limits.
+          Pending and Packed both come from the same useDashboardStats() call:
+          packedOrders is counted once (packing_records, status='Packed'), and
+          pendingOrders = totalOrders - packedOrders. The Packing Progress
+          widget below uses the same packedOrders definition (scoped to today)
+          via usePackingProgress(), so every "Packed"/"Pending" number on this
+          page always agrees. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-7">
         <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={<ShoppingCart className="h-4 w-4" />} />
         <StatCard label="Pending Orders" value={String(stats.pendingOrders)} icon={<Truck className="h-4 w-4" />} />
@@ -302,6 +337,74 @@ function DashboardPage() {
         <StatCard label="Active Packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
         <StatCard label="Active Users" value={String(stats.activeUsers)} icon={<UserCheck className="h-4 w-4" />} />
       </div>
+
+      {isOwnerOrSupervisor && (
+        <div className="rounded-lg border bg-card p-5 shadow-card">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Packing Progress</h3>
+              <p className="text-xs text-muted-foreground">Resets automatically each day · today's orders only</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs text-success">
+              <Activity className="h-3.5 w-3.5" /> Live
+            </span>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="rounded-md border bg-background/40 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Today's Orders</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight">{progress.todayOrders}</div>
+            </div>
+            <div className="rounded-md border bg-background/40 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending Orders</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight">{progress.pendingOrders}</div>
+            </div>
+            <div className="rounded-md border bg-background/40 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Packed Orders</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight">{progress.packedOrders}</div>
+            </div>
+            <div className="rounded-md border bg-background/40 p-4">
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Packing Progress</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight">{progress.packingProgress}%</div>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Progress value={progress.packingProgress} className="h-2.5" />
+          </div>
+        </div>
+      )}
+
+      {isOwnerOrSupervisor && (
+        <div className="rounded-lg border bg-card shadow-card">
+          <div className="flex items-center justify-between border-b px-5 py-3">
+            <div>
+              <h3 className="text-sm font-semibold">Today's Packers</h3>
+              <p className="text-xs text-muted-foreground">Sorted by packed orders · resets daily</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 text-xs text-success">
+              <Radio className="h-3.5 w-3.5" /> Live
+            </span>
+          </div>
+          <div className="divide-y max-h-96 overflow-y-auto">
+            {packers.map((p) => (
+              <div key={p.userId} className="flex items-center gap-4 px-5 py-3 text-sm">
+                <div className="flex-1 min-w-0">
+                  <div className="truncate font-medium">{p.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    Last scan: {new Date(p.lastScanTime).toLocaleTimeString()}
+                  </div>
+                </div>
+                <div className="w-28 text-right font-mono text-sm">{p.packedOrders} packed</div>
+                <StatusPill tone={p.isActive ? "success" : "muted"}>{p.isActive ? "Active" : "Offline"}</StatusPill>
+              </div>
+            ))}
+            {!packers.length && (
+              <div className="px-5 py-8 text-center text-sm text-muted-foreground">No packing activity today yet.</div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-lg border bg-card p-5 shadow-card">
