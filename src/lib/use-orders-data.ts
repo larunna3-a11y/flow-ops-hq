@@ -237,27 +237,19 @@ export function useDashboardStats(range?: { from: string; to: string }) {
 /**
  * Live "Packing Progress" widget stats for the Dashboard (Owner/Supervisor only).
  * All counts use server-side COUNT(head: true) aggregate queries — never loads
- * full row sets — so this stays cheap on large datasets.
+/**
+ * Live "Packing Progress" widget stats for the Dashboard (Owner/Supervisor only).
  *
- * Business rules:
- * - todayOrders   = orders imported (created_at) today only. Resets automatically
- *                   at local midnight since it's derived from "now" on every fetch;
- *                   historical orders are never deleted or modified.
- * - packedOrders  = SUM(all successful packing confirmations today) across EVERY
- *                   packer in the workspace — i.e. count of packing_records with
- *                   status = 'Packed' and created_at today, workspace-wide (never
- *                   scoped to a single user). This is the exact same query
- *                   (workspace_id + status='Packed' + today), via the shared
- *                   fetchPackedOrdersCount() helper, used to build the
- *                   "Today's Packers" list in useTodayPackers() and the top
- *                   dashboard "Packed" KPI in useDashboardStats(), so this number
- *                   always equals the sum of every packer's count shown there.
- * - pendingOrders = todayOrders - packedOrders. Always derived from the same two
- *                   numbers shown elsewhere on this widget — never queried via a
- *                   separate packing_status = 'pending' filter — so it can never
- *                   drift out of sync with what's actually been packed.
- * - packingProgress = packedOrders / todayOrders * 100 (capped at 100, 0 when no
- *                   orders were imported today).
+ * MUST DISPLAY IDENTICAL VALUES to the top dashboard KPI row. Reads from the
+ * same single source of truth (useDashboardStats) — no independent counts,
+ * no separate date-window logic — so Total / Packed / Pending are guaranteed
+ * to match everywhere on the page.
+ *
+ *   todayOrders    = totalOrders   (all-time, workspace-wide)
+ *   packedOrders   = COUNT(packing_records WHERE status='Packed')
+ *                    across every packer in the workspace
+ *   pendingOrders  = totalOrders − packedOrders
+ *   packingProgress = packedOrders / totalOrders * 100
  */
 export function usePackingProgress() {
   const ws = useWorkspace();
@@ -267,34 +259,24 @@ export function usePackingProgress() {
     enabled: !!wid,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date();
-      todayEnd.setHours(23, 59, 59, 999);
-      const todayRange = { from: todayStart.toISOString(), to: todayEnd.toISOString() };
-
-      const [todayOrdersRes, packedOrders] = await Promise.all([
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .gte("created_at", todayRange.from)
-          .lte("created_at", todayRange.to),
-
-        // Workspace-wide count of successful packing confirmations made today,
-        // across ALL packers — never filtered to a single user. Shared helper
-        // keeps this identical to useDashboardStats() and useTodayPackers().
-        fetchPackedOrdersCount(wid as string, todayRange),
+      const [totalOrdersRes, packedOrders] = await Promise.all([
+        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
+        // Same helper as useDashboardStats — guarantees identical Packed value.
+        fetchPackedOrdersCount(wid as string),
       ]);
 
-      const todayOrders = todayOrdersRes.count ?? 0;
-      const pendingOrders = Math.max(0, todayOrders - packedOrders);
-      const packingProgress = todayOrders > 0 ? Math.min(100, Math.round((packedOrders / todayOrders) * 1000) / 10) : 0;
+      const totalOrders = totalOrdersRes.count ?? 0;
+      const pendingOrders = Math.max(0, totalOrders - packedOrders);
+      const packingProgress =
+        totalOrders > 0 ? Math.min(100, Math.round((packedOrders / totalOrders) * 1000) / 10) : 0;
 
-      return { todayOrders, pendingOrders, packedOrders, packingProgress } as PackingProgressStats;
+      // Field name `todayOrders` is preserved to avoid a UI change; it now
+      // carries the workspace-wide totalOrders value that matches the top KPI.
+      return { todayOrders: totalOrders, pendingOrders, packedOrders, packingProgress } as PackingProgressStats;
     },
   });
 }
+
 
 // --- Packing Exception Report (Reports module — Owner/Supervisor) ---
 export type PackingExceptionFilters = {
