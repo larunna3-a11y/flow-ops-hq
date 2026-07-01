@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusPill, statusToTone } from "@/components/status-pill";
@@ -10,6 +11,7 @@ import { useImports } from "@/lib/use-orders-data";
 import { useWorkspace, useCurrentUser } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { parseDestyFile, type DestyParseResult } from "@/lib/desty-parser";
+import { deleteImportBatch } from "@/lib/imports.functions";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import {
@@ -31,48 +33,6 @@ export const Route = createFileRoute("/_app/imports")({
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-// Supabase/PostgREST `.in(col, [...])` filters are serialized into the
-// request URL as `col=in.(v1,v2,...)`. When an import batch contains a
-// large number of orders, passing every id/order_number/tracking_number
-// in a single `.in()` call can push the URL past the gateway's length
-// limit. When that happens the proxy in front of PostgREST rejects the
-// request before it ever reaches the database, returning a bare
-// `400 Bad Request` with no JSON body — which is why the resulting
-// error surfaces as just "Bad Request" with no further detail.
-//
-// To keep every `.in()`-based delete in the Import Batch deletion flow
-// safe regardless of batch size, we chunk the value list and issue
-// multiple smaller delete requests instead of one unbounded one.
-const DELETE_CHUNK_SIZE = 150;
-
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    chunks.push(arr.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
- * Runs `db.from(table).delete().eq(workspace_id, wid).in(column, values)`
- * in chunks to avoid oversized request URLs. Returns the first error
- * encountered (if any) after attempting all chunks.
- */
-async function deleteInChunks(
-  table: string,
-  workspaceId: string,
-  column: string,
-  values: string[],
-): Promise<{ message: string } | null> {
-  if (!values.length) return null;
-  for (const chunk of chunkArray(values, DELETE_CHUNK_SIZE)) {
-    const { error } = await db.from(table).delete().eq("workspace_id", workspaceId).in(column, chunk);
-    if (error) {
-      return error;
-    }
-  }
-  return null;
-}
 
 function ImportsPage() {
   const { t } = useTranslation();
@@ -81,6 +41,7 @@ function ImportsPage() {
   const user = useCurrentUser();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deleteBatch = useServerFn(deleteImportBatch);
 
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -92,6 +53,7 @@ function ImportsPage() {
 
   const role = ws.data?.role ?? null;
   const canDelete = role === "Owner" || role === "Supervisor";
+
 
   async function onFileChosen(file: File) {
     setParsing(true);
@@ -138,12 +100,38 @@ function ImportsPage() {
         return true;
       });
 
+      // Create the import batch row first so we can stamp `import_id` on every
+      // order we insert. This makes deletion deterministic instead of relying
+      // on a ±60s time window heuristic.
+      const { data: importRow, error: impInsertErr } = await db
+        .from("imports")
+        .insert({
+          workspace_id: wid,
+          imported_by: user.data?.id ?? null,
+          imported_by_name: user.data?.user_metadata?.full_name ?? user.data?.email ?? null,
+          filename: preview.filename,
+          total_rows: preview.totalRows,
+          success_count: 0,
+          failed_count: 0,
+          duplicate_count: duplicates,
+          status: "in_progress",
+        })
+        .select("id")
+        .single();
+      if (impInsertErr) {
+        toast.error(impInsertErr.message);
+        setImporting(false);
+        return;
+      }
+      const importId = importRow.id as string;
+
       // Insert orders in chunks
       const CHUNK = 200;
       for (let i = 0; i < toInsert.length; i += CHUNK) {
         const slice = toInsert.slice(i, i + CHUNK);
         const orderRows = slice.map((o) => ({
           workspace_id: wid,
+          import_id: importId,
           order_number: o.order_number,
           tracking_number: o.tracking_number,
           store_name: o.store_name,
@@ -189,18 +177,15 @@ function ImportsPage() {
         success += inserted?.length ?? 0;
       }
 
-      // Record import batch
-      await db.from("imports").insert({
-        workspace_id: wid,
-        imported_by: user.data?.id ?? null,
-        imported_by_name: user.data?.user_metadata?.full_name ?? user.data?.email ?? null,
-        filename: preview.filename,
-        total_rows: preview.totalRows,
-        success_count: success,
-        failed_count: failed,
-        duplicate_count: duplicates,
-        status: failed > 0 ? "completed_with_errors" : "completed",
-      });
+      // Finalize the import batch row with real counts.
+      await db
+        .from("imports")
+        .update({
+          success_count: success,
+          failed_count: failed,
+          status: failed > 0 ? "completed_with_errors" : "completed",
+        })
+        .eq("id", importId);
 
       toast.success(`Imported ${success} orders (${duplicates} duplicates skipped)`);
       setPreview(null);
@@ -209,6 +194,7 @@ function ImportsPage() {
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+      qc.invalidateQueries({ queryKey: ["packing_progress"] });
       qc.invalidateQueries({ queryKey: ["packing"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Import failed.");
@@ -218,115 +204,27 @@ function ImportsPage() {
   }
 
   /**
-   * Delete an imported batch and ALL data it produced:
-   *   - orders created during the import window
-   *   - their order_items
-   *   - related packing_records (matched by order_number / tracking_number)
-   *   - related returns (matched by order_id)
-   *   - the import history record itself
-   *
-   * Orders are matched by a tight ±60s window around the import's created_at,
-   * which is the period in which confirmImport() inserts its rows. After
-   * deletion the same Desty OMS file can be re-imported because the unique
-   * (workspace_id, order_number) rows are gone.
+   * Delete an imported batch and every row it produced. Runs on the server
+   * with the service-role client so RLS + URL-length limits can't fail the
+   * cascade halfway through — the previous client-side flow returned bare
+   * "Bad Request" on large batches.
    */
   async function deleteImport(id: string) {
-    const wid = ws.data?.workspace?.id;
-    if (!wid) return;
     setDeleting(true);
     try {
-      const { data: imp, error: impFetchErr } = await db
-        .from("imports")
-        .select("created_at, filename")
-        .eq("id", id)
-        .maybeSingle();
-      if (impFetchErr) {
-        toast.error(impFetchErr.message);
-        return;
-      }
-
-      if (imp) {
-        const createdAt = new Date(imp.created_at);
-        const from = new Date(createdAt.getTime() - 60_000).toISOString();
-        const to = new Date(createdAt.getTime() + 60_000).toISOString();
-
-        const { data: orderRows, error: orderFetchErr } = await db
-          .from("orders")
-          .select("id, order_number, tracking_number")
-          .eq("workspace_id", wid)
-          .gte("created_at", from)
-          .lte("created_at", to);
-        if (orderFetchErr) {
-          toast.error(orderFetchErr.message);
-          return;
-        }
-
-        const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
-        const orderNumbers = (orderRows ?? [])
-          .map((r: { order_number: string | null }) => r.order_number)
-          .filter((n: string | null): n is string => !!n);
-        const trackingNumbers = (orderRows ?? [])
-          .map((r: { tracking_number: string | null }) => r.tracking_number)
-          .filter((n: string | null): n is string => !!n);
-
-        if (orderIds.length) {
-          // 1) Related returns (and their dependent rows — return_items,
-          //    return_timeline — cascade via FK ON DELETE CASCADE).
-          //    Chunked: large batches can exceed the request's max URL
-          //    length when every order id is inlined into a single
-          //    `.in()` filter, which the gateway rejects as a bare
-          //    "Bad Request" before it reaches PostgREST.
-          const returnsErr = await deleteInChunks("returns", wid, "order_id", orderIds);
-          if (returnsErr) {
-            toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
-            return;
-          }
-
-          // 2) Related packing_records — matched by order_number OR tracking_number.
-          if (orderNumbers.length) {
-            const prByNumberErr = await deleteInChunks("packing_records", wid, "order_number", orderNumbers);
-            if (prByNumberErr) {
-              toast.error(`Couldn't delete packing records: ${prByNumberErr.message}`);
-              return;
-            }
-          }
-          if (trackingNumbers.length) {
-            const prByTrackingErr = await deleteInChunks("packing_records", wid, "tracking_number", trackingNumbers);
-            if (prByTrackingErr) {
-              toast.error(`Couldn't delete packing records: ${prByTrackingErr.message}`);
-              return;
-            }
-          }
-
-          // 3) Order items, then orders (FK order).
-          const itemsErr = await deleteInChunks("order_items", wid, "order_id", orderIds);
-          if (itemsErr) {
-            toast.error(`Couldn't delete order items: ${itemsErr.message}`);
-            return;
-          }
-
-          const ordersErr = await deleteInChunks("orders", wid, "id", orderIds);
-          if (ordersErr) {
-            toast.error(`Couldn't delete orders: ${ordersErr.message}`);
-            return;
-          }
-        }
-      }
-
-      // 4) Finally delete the import history row.
-      const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
-      toast.success("Imported batch and all related data deleted.");
+      const res = await deleteBatch({ data: { importId: id } });
+      toast.success(
+        `Deleted batch — removed ${res.removedOrders} orders, ${res.removedItems} items, ${res.removedPacking} packing records, ${res.removedReturns} returns.`,
+      );
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["returns"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+      qc.invalidateQueries({ queryKey: ["packing_progress"] });
+      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
+      qc.invalidateQueries({ queryKey: ["today_packers"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
     } catch (e) {
@@ -336,6 +234,8 @@ function ImportsPage() {
       setDeleteTarget(null);
     }
   }
+
+
 
   return (
     <div className="space-y-6">

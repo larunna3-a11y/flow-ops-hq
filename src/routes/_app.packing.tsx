@@ -457,7 +457,10 @@ function PackingPage() {
 
       if (scan.editingRecordId) {
         // ── UPDATE existing record ──────────────────────────────────────────
-        const { error } = await supabase.from("packing_records").update(recordPayload).eq("id", scan.editingRecordId);
+        const { error } = await supabase
+          .from("packing_records")
+          .update({ ...recordPayload, updated_by: userId, updated_at: nowIso } as never)
+          .eq("id", scan.editingRecordId);
 
         if (error) {
           toast.error(error.message);

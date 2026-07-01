@@ -765,6 +765,7 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           id: string
+          import_id: string | null
           marketplace: string | null
           order_number: string
           order_status: string
@@ -789,6 +790,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          import_id?: string | null
           marketplace?: string | null
           order_number: string
           order_status?: string
@@ -813,6 +815,7 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          import_id?: string | null
           marketplace?: string | null
           order_number?: string
           order_status?: string
@@ -906,6 +909,7 @@ export type Database = {
           status: string
           tracking_number: string | null
           updated_at: string
+          updated_by: string | null
           user_id: string
           user_name: string
           verified_skus: Json
@@ -927,6 +931,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id: string
           user_name: string
           verified_skus?: Json
@@ -948,6 +953,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id?: string
           user_name?: string
           verified_skus?: Json
@@ -1193,6 +1199,7 @@ export type Database = {
           status: string
           tracking_number: string | null
           updated_at: string
+          updated_by: string | null
           workspace_id: string
         }
         Insert: {
@@ -1223,6 +1230,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           updated_at?: string
+          updated_by?: string | null
           workspace_id: string
         }
         Update: {
@@ -1253,6 +1261,7 @@ export type Database = {
           status?: string
           tracking_number?: string | null
           updated_at?: string
+          updated_by?: string | null
           workspace_id?: string
         }
         Relationships: [

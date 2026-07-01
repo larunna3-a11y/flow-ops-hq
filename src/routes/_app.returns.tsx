@@ -718,17 +718,20 @@ function ReturnInspectionSheet({
       : { data: null as { full_name: string | null; email: string } | null };
     const inspectorName = prof?.full_name || prof?.email || null;
     const previousStatus = record.status;
+    const nowIso = new Date().toISOString();
     const patch: Record<string, unknown> = {
       reason: reason || null,
       condition: condition || null,
       inspection_notes: notes || null,
       status,
       resolution: resolution || null,
-      inspection_date: new Date().toISOString(),
+      inspection_date: nowIso,
       inspector_id: user ?? null,
       inspector_name: inspectorName,
+      updated_by: user ?? null,
+      updated_at: nowIso,
     };
-    if (status === "completed") patch.completed_at = new Date().toISOString();
+    if (status === "completed") patch.completed_at = nowIso;
     const { error } = await supabase.from("returns").update(patch as never).eq("id", record.id);
     setSavingForm(false);
     if (error) {
@@ -765,8 +768,12 @@ function ReturnInspectionSheet({
       });
     }
     qc.invalidateQueries({ queryKey: ["returns"] });
+    qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    qc.invalidateQueries({ queryKey: ["reports"] });
     toast.success("Inspection saved");
   }
+
 
   const discrepancies = (items.data ?? []).filter(
     (i) =>
