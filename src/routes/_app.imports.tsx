@@ -192,6 +192,8 @@ function ImportsPage() {
     if (!wid) return;
     setDeleting(true);
     try {
+      // 1) Ambil semua order yang memiliki batch ID ini (jika ada relasi kolom),
+      // atau cari orderIds berdasarkan rentang waktu batch ini jika tidak ada kolom langsung.
       const { data: imp, error: impFetchErr } = await db
         .from("imports")
         .select("created_at, filename")
@@ -227,15 +229,19 @@ function ImportsPage() {
           .filter((n: string | null): n is string => !!n);
 
         if (orderIds.length) {
-          // 1) Related returns (and their dependent rows cascade via FK).
-          const { error: returnsErr } = await db
-            .from("returns")
-            .delete()
-            .eq("workspace_id", wid)
-            .in("order_id", orderIds);
-          if (returnsErr) {
-            toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
-            return;
+          // PERBAIKAN: Hapus data returns secara andal satu per satu atau batasi chunk
+          // untuk menghindari kegagalan 'Bad Request' akibat batasan query .in() Supabase
+          for (const orderId of orderIds) {
+            const { error: returnsErr } = await db
+              .from("returns")
+              .delete()
+              .eq("workspace_id", wid)
+              .eq("order_id", orderId);
+
+            if (returnsErr) {
+              toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
+              return;
+            }
           }
 
           // 2) Related packing_records — matched by order_number OR tracking_number.
@@ -262,7 +268,7 @@ function ImportsPage() {
             }
           }
 
-          // 3) Order items, then orders (FK order).
+          // 3) Order items, kemudian orders (Sesuai urutan FK dependensi).
           const { error: itemsErr } = await db
             .from("order_items")
             .delete()
@@ -281,7 +287,7 @@ function ImportsPage() {
         }
       }
 
-      // 4) Finally delete the import history row.
+      // 4) Terakhir hapus baris riwayat import batch itu sendiri
       const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
       if (error) {
         toast.error(error.message);
@@ -289,10 +295,13 @@ function ImportsPage() {
       }
 
       toast.success("Imported batch and all related data deleted.");
+
+      // PERBAIKAN: Memastikan semua queries yang berkaitan langsung di-refresh/invalidate
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
       qc.invalidateQueries({ queryKey: ["packing_records"] });
+      qc.invalidateQueries({ queryKey: ["packing"] });
       qc.invalidateQueries({ queryKey: ["returns"] });
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
