@@ -137,8 +137,18 @@ async function fetchPackedOrdersCount(workspaceId: string, range?: { from: strin
 /**
  * Aggregate dashboard stats using server-side COUNT queries.
  * Never loads full rows — safe for any dataset size.
- * Accepts an optional date range (from/to ISO strings) to scope
- * time-sensitive stats; totalOrders always counts all orders.
+ *
+ * SINGLE SOURCE OF TRUTH for Total / Packed / Pending across the entire app.
+ * These three numbers are ALWAYS workspace-wide, all-time — never scoped to
+ * the dashboard's date-range preset — so the top KPI row, the Packing
+ * Progress widget, and the Packing Queue always display identical values.
+ *
+ *   totalOrders   = COUNT(orders)                                (all-time)
+ *   packedOrders  = COUNT(packing_records WHERE status='Packed') (all-time,
+ *                   summed across every packer in the workspace)
+ *   pendingOrders = totalOrders − packedOrders                   (derived)
+ *
+ * Only shipped / returns / activePackers / activeUsers honour the date range.
  */
 export function useDashboardStats(range?: { from: string; to: string }) {
   const ws = useWorkspace();
@@ -153,9 +163,9 @@ export function useDashboardStats(range?: { from: string; to: string }) {
           // Total orders — always all orders, no date filter
           db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
 
-          // Packed orders — single source of truth, shared with
-          // usePackingProgress / Today's Packers (see fetchPackedOrdersCount).
-          fetchPackedOrdersCount(wid as string, range),
+          // Packed orders — all-time, workspace-wide. Same helper used by
+          // usePackingProgress so both widgets always agree.
+          fetchPackedOrdersCount(wid as string),
 
           // Shipped orders in range
           (() => {
@@ -209,10 +219,9 @@ export function useDashboardStats(range?: { from: string; to: string }) {
 
       return {
         totalOrders,
-        // Pending is always derived from the same totalOrders/packedOrders
-        // numbers shown elsewhere on the dashboard — never queried via a
-        // separate packing_status = 'pending' filter, so it can never
-        // drift out of sync with what's actually been packed.
+        // Pending is always totalOrders − packedOrders (both all-time). Never
+        // queried via a separate packing_status = 'pending' filter, so it
+        // cannot drift out of sync with what's actually been packed.
         pendingOrders: Math.max(0, totalOrders - packedOrders),
         packedOrders,
         shippedOrders: shippedOrdersRes.count ?? 0,
@@ -223,6 +232,7 @@ export function useDashboardStats(range?: { from: string; to: string }) {
     },
   });
 }
+
 
 /**
  * Live "Packing Progress" widget stats for the Dashboard (Owner/Supervisor only).
