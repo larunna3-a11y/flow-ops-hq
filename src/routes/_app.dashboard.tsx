@@ -44,7 +44,7 @@ import {
   useWorkspaceMembers,
   useTodayPackers,
 } from "@/lib/use-warehouse-data";
-import { useDashboardStats, useImports, usePackingProgress } from "@/lib/use-orders-data";
+import { useDashboardStats, useImports, usePackingProgress, useOrderCounts } from "@/lib/use-orders-data";
 import { useWorkspace } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -90,6 +90,8 @@ function DashboardPage() {
 
   // Aggregate stats — no row limits, server-side COUNT queries
   const dashboardStats = useDashboardStats(range);
+  // Stable range-independent counts shared with the Packing page
+  const orderCounts = useOrderCounts();
 
   // Live Packing Progress widget — independent of the date-range preset above,
   // always reflects "today" per the business rules (Owner/Supervisor only).
@@ -135,6 +137,7 @@ function DashboardPage() {
         { event: "*", schema: "public", table: "orders", filter: `workspace_id=eq.${workspaceId}` },
         () => {
           qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -145,6 +148,7 @@ function DashboardPage() {
         () => {
           qc.invalidateQueries({ queryKey: ["order_items"] });
           qc.invalidateQueries({ queryKey: ["orders"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -154,6 +158,7 @@ function DashboardPage() {
         { event: "*", schema: "public", table: "imports", filter: `workspace_id=eq.${workspaceId}` },
         () => {
           qc.invalidateQueries({ queryKey: ["imports"] });
+          qc.invalidateQueries({ queryKey: ["order_counts"] });
           qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
           qc.invalidateQueries({ queryKey: ["packing_progress"] });
         },
@@ -190,14 +195,14 @@ function DashboardPage() {
   const ret = returns.data ?? [];
   const mem = members.data ?? [];
 
-  const stats = dashboardStats.data ?? {
-    totalOrders: 0,
-    pendingOrders: 0,
-    packedOrders: 0,
-    shippedOrders: 0,
-    totalReturns: 0,
-    activePackers: 0,
-    activeUsers: 0,
+  const stats = {
+    totalOrders: orderCounts.data?.totalOrders ?? 0,
+    pendingOrders: orderCounts.data?.pendingOrders ?? 0,
+    packedOrders: dashboardStats.data?.packedOrders ?? 0,
+    shippedOrders: dashboardStats.data?.shippedOrders ?? 0,
+    totalReturns: dashboardStats.data?.totalReturns ?? 0,
+    activePackers: dashboardStats.data?.activePackers ?? 0,
+    activeUsers: dashboardStats.data?.activeUsers ?? 0,
   };
 
   const progress = packingProgress.data ?? {
@@ -322,13 +327,16 @@ function DashboardPage() {
       />
 
       {/* Single KPI row — aggregate queries, no row limits.
-          "Packed" is sourced from `progress.packedOrders` (usePackingProgress),
-          the same workspace-wide, all-packers, today-only count that drives the
-          Packing Progress widget and equals the sum of Today's Packers below. */}
+          Pending and Packed both come from the same useDashboardStats() call:
+          packedOrders is counted once (packing_records, status='Packed'), and
+          pendingOrders = totalOrders - packedOrders. The Packing Progress
+          widget below uses the same packedOrders definition (scoped to today)
+          via usePackingProgress(), so every "Packed"/"Pending" number on this
+          page always agrees. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-7">
         <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={<ShoppingCart className="h-4 w-4" />} />
         <StatCard label="Pending Orders" value={String(stats.pendingOrders)} icon={<Truck className="h-4 w-4" />} />
-        <StatCard label="Packed" value={String(progress.packedOrders)} icon={<PackageCheck className="h-4 w-4" />} />
+        <StatCard label="Packed" value={String(stats.packedOrders)} icon={<PackageCheck className="h-4 w-4" />} />
         <StatCard label="Shipped" value={String(stats.shippedOrders)} icon={<Truck className="h-4 w-4" />} />
         <StatCard label="Total Returns" value={String(stats.totalReturns)} icon={<RotateCcw className="h-4 w-4" />} />
         <StatCard label="Active Packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />

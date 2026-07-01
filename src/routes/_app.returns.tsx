@@ -34,22 +34,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/lib/use-workspace";
@@ -161,7 +148,10 @@ function ReturnsPage() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "returns", filter: `workspace_id=eq.${workspaceId}` },
-        () => qc.invalidateQueries({ queryKey: ["returns"] }),
+        () => {
+          qc.invalidateQueries({ queryKey: ["returns"] });
+          qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
+        },
       )
       .on(
         "postgres_changes",
@@ -179,10 +169,7 @@ function ReturnsPage() {
     };
   }, [workspaceId, qc]);
 
-  const filtered = useMemo(
-    () => (tab === "all" ? data : data.filter((r) => r.status === tab)),
-    [data, tab],
-  );
+  const filtered = useMemo(() => (tab === "all" ? data : data.filter((r) => r.status === tab)), [data, tab]);
 
   const kpis = useMemo(
     () => ({
@@ -204,9 +191,7 @@ function ReturnsPage() {
         .from("returns")
         .select("id")
         .eq("workspace_id", workspaceId)
-        .or(
-          `return_number.eq.${q},rma.eq.${q},tracking_number.eq.${q},order_number.eq.${q}`,
-        )
+        .or(`return_number.eq.${q},rma.eq.${q},tracking_number.eq.${q},order_number.eq.${q}`)
         .limit(1)
         .maybeSingle();
       if (existing?.id) {
@@ -216,9 +201,7 @@ function ReturnsPage() {
       // Otherwise look up source order by tracking/order number
       const { data: order } = await supabase
         .from("orders")
-        .select(
-          "id, order_number, tracking_number, marketplace, courier, customer_name, ordered_at",
-        )
+        .select("id, order_number, tracking_number, marketplace, courier, customer_name, ordered_at")
         .eq("workspace_id", workspaceId)
         .or(`tracking_number.eq.${q},order_number.eq.${q}`)
         .limit(1)
@@ -236,11 +219,7 @@ function ReturnsPage() {
 
   async function createReturnFromOrder(orderId: string, hintNumber: string) {
     if (!workspaceId) return null;
-    const { data: order } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", orderId)
-      .maybeSingle();
+    const { data: order } = await supabase.from("orders").select("*").eq("id", orderId).maybeSingle();
     if (!order) return null;
     const { data: pack } = await supabase
       .from("packing_records")
@@ -317,7 +296,12 @@ function ReturnsPage() {
     return inserted.id;
   }
 
-  async function appendTimeline(returnId: string, event: string, message: string, metadata: Record<string, unknown> = {}) {
+  async function appendTimeline(
+    returnId: string,
+    event: string,
+    message: string,
+    metadata: Record<string, unknown> = {},
+  ) {
     if (!workspaceId) return;
     const user = ws.data?.userId;
     if (!user) return;
@@ -361,7 +345,12 @@ function ReturnsPage() {
     }
     await appendTimeline(inserted.id, "return.created", `Return ${inserted.return_number} created manually.`);
     await log({
-      data: { action: "return.created", target_type: "return", target_id: inserted.id, metadata: { return_number: inserted.return_number } },
+      data: {
+        action: "return.created",
+        target_type: "return",
+        target_id: inserted.id,
+        metadata: { return_number: inserted.return_number },
+      },
     }).catch(() => undefined);
     notify({
       type: "return.created",
@@ -372,12 +361,18 @@ function ReturnsPage() {
       roles: ["Return Staff", "Supervisor"],
     });
     setOpen(false);
-    setForm({ return_number: "", order_number: "", tracking_number: "", marketplace: MARKETPLACES[0], reason: REASONS[0] });
+    setForm({
+      return_number: "",
+      order_number: "",
+      tracking_number: "",
+      marketplace: MARKETPLACES[0],
+      reason: REASONS[0],
+    });
     qc.invalidateQueries({ queryKey: ["returns"] });
     setActiveId(inserted.id);
   }
 
-  const active = activeId ? data.find((r) => r.id === activeId) ?? null : null;
+  const active = activeId ? (data.find((r) => r.id === activeId) ?? null) : null;
 
   return (
     <div className="space-y-6">
@@ -386,7 +381,9 @@ function ReturnsPage() {
         description={t("returns.description")}
         actions={
           <>
-            <Button variant="outline" size="sm">{t("common.export")}</Button>
+            <Button variant="outline" size="sm">
+              {t("common.export")}
+            </Button>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">{t("returns.newRma")}</Button>
@@ -399,34 +396,58 @@ function ReturnsPage() {
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label>Return number</Label>
-                    <Input value={form.return_number} onChange={(e) => setForm({ ...form, return_number: e.target.value })} placeholder="RMA-44126" />
+                    <Input
+                      value={form.return_number}
+                      onChange={(e) => setForm({ ...form, return_number: e.target.value })}
+                      placeholder="RMA-44126"
+                    />
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label>Order number</Label>
-                      <Input value={form.order_number} onChange={(e) => setForm({ ...form, order_number: e.target.value })} placeholder="INV/…/MPL/…" />
+                      <Input
+                        value={form.order_number}
+                        onChange={(e) => setForm({ ...form, order_number: e.target.value })}
+                        placeholder="INV/…/MPL/…"
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Tracking number</Label>
-                      <Input value={form.tracking_number} onChange={(e) => setForm({ ...form, tracking_number: e.target.value })} placeholder="JNE…" />
+                      <Input
+                        value={form.tracking_number}
+                        onChange={(e) => setForm({ ...form, tracking_number: e.target.value })}
+                        placeholder="JNE…"
+                      />
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label>Marketplace</Label>
                       <Select value={form.marketplace} onValueChange={(v) => setForm({ ...form, marketplace: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
-                          {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          {MARKETPLACES.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
                       <Label>Reason</Label>
                       <Select value={form.reason} onValueChange={(v) => setForm({ ...form, reason: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
-                          {REASONS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          {REASONS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -477,8 +498,16 @@ function ReturnsPage() {
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label={t("returns.kpis.open")} value={String(kpis.open)} icon={<RotateCcw className="h-4 w-4" />} />
-        <StatCard label={t("returns.kpis.restocked")} value={String(kpis.restocked)} icon={<PackageOpen className="h-4 w-4" />} />
-        <StatCard label={t("returns.kpis.rejected")} value={String(kpis.rejected)} icon={<PackageX className="h-4 w-4" />} />
+        <StatCard
+          label={t("returns.kpis.restocked")}
+          value={String(kpis.restocked)}
+          icon={<PackageOpen className="h-4 w-4" />}
+        />
+        <StatCard
+          label={t("returns.kpis.rejected")}
+          value={String(kpis.rejected)}
+          icon={<PackageX className="h-4 w-4" />}
+        />
         <StatCard label="Total returns" value={String(kpis.total)} icon={<CheckCircle2 className="h-4 w-4" />} />
       </div>
 
@@ -509,16 +538,14 @@ function ReturnsPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((r) => (
-                <TableRow
-                  key={r.id}
-                  className="cursor-pointer hover:bg-muted/40"
-                  onClick={() => setActiveId(r.id)}
-                >
+                <TableRow key={r.id} className="cursor-pointer hover:bg-muted/40" onClick={() => setActiveId(r.id)}>
                   <TableCell className="font-mono text-xs">{r.return_number ?? r.rma}</TableCell>
                   <TableCell className="font-mono text-xs">{r.order_number ?? "—"}</TableCell>
                   <TableCell>{r.marketplace ?? "—"}</TableCell>
                   <TableCell className="text-sm">{r.reason ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{new Date(r.received_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(r.received_at).toLocaleDateString()}
+                  </TableCell>
                   <TableCell className="text-right">
                     <StatusPill tone={statusTone(r.status)}>{STATUS_LABEL[r.status] ?? r.status}</StatusPill>
                   </TableCell>
@@ -526,7 +553,9 @@ function ReturnsPage() {
               ))}
               {!filtered.length && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">No returns yet.</TableCell>
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                    No returns yet.
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -534,11 +563,7 @@ function ReturnsPage() {
         </div>
       </div>
 
-      <ReturnInspectionSheet
-        record={active}
-        onClose={() => setActiveId(null)}
-        appendTimeline={appendTimeline}
-      />
+      <ReturnInspectionSheet record={active} onClose={() => setActiveId(null)} appendTimeline={appendTimeline} />
     </div>
   );
 }
@@ -568,21 +593,17 @@ function ReturnInspectionSheet({
    *    or the record has not been claimed yet so they can take ownership).
    *  - Other roles: read-only.
    */
-  const canEditThisReturn = !!record && (
-    role === "Owner" ||
-    role === "Supervisor" ||
-    (role === "Return Staff" && (!record.inspector_id || record.inspector_id === currentUserId))
-  );
+  const canEditThisReturn =
+    !!record &&
+    (role === "Owner" ||
+      role === "Supervisor" ||
+      (role === "Return Staff" && (!record.inspector_id || record.inspector_id === currentUserId)));
 
   const items = useQuery({
     queryKey: ["return-items", id],
     enabled: !!id,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("return_items")
-        .select("*")
-        .eq("return_id", id!)
-        .order("created_at");
+      const { data, error } = await supabase.from("return_items").select("*").eq("return_id", id!).order("created_at");
       if (error) throw error;
       return (data ?? []) as ReturnItem[];
     },
@@ -674,7 +695,9 @@ function ReturnInspectionSheet({
       toast.error(error.message);
       return;
     }
-    await appendTimeline(record.id, "return.photos.uploaded", `Uploaded ${added.length} inspection photo(s).`, { count: added.length });
+    await appendTimeline(record.id, "return.photos.uploaded", `Uploaded ${added.length} inspection photo(s).`, {
+      count: added.length,
+    });
     qc.invalidateQueries({ queryKey: ["returns"] });
     toast.success(`${added.length} photo(s) uploaded`);
   }
@@ -687,7 +710,10 @@ function ReturnInspectionSheet({
     }
     await supabase.storage.from("return-photos").remove([path]);
     const next = (record.inspection_photos ?? []).filter((p) => p.path !== path);
-    await supabase.from("returns").update({ inspection_photos: next as never }).eq("id", record.id);
+    await supabase
+      .from("returns")
+      .update({ inspection_photos: next as never })
+      .eq("id", record.id);
     await appendTimeline(record.id, "return.photo.removed", `Removed inspection photo.`, { path });
     qc.invalidateQueries({ queryKey: ["returns"] });
   }
@@ -729,17 +755,25 @@ function ReturnInspectionSheet({
       inspector_name: inspectorName,
     };
     if (status === "completed") patch.completed_at = new Date().toISOString();
-    const { error } = await supabase.from("returns").update(patch as never).eq("id", record.id);
+    const { error } = await supabase
+      .from("returns")
+      .update(patch as never)
+      .eq("id", record.id);
     setSavingForm(false);
     if (error) {
       toast.error(error.message);
       return;
     }
     if (previousStatus !== status) {
-      await appendTimeline(record.id, "return.status_changed", `Status changed: ${STATUS_LABEL[previousStatus] ?? previousStatus} → ${STATUS_LABEL[status] ?? status}.`, {
-        from: previousStatus,
-        to: status,
-      });
+      await appendTimeline(
+        record.id,
+        "return.status_changed",
+        `Status changed: ${STATUS_LABEL[previousStatus] ?? previousStatus} → ${STATUS_LABEL[status] ?? status}.`,
+        {
+          from: previousStatus,
+          to: status,
+        },
+      );
     }
     await appendTimeline(record.id, "return.inspection_saved", `Inspection updated by ${inspectorName ?? "user"}.`, {
       condition,
@@ -793,7 +827,9 @@ function ReturnInspectionSheet({
               <section className="rounded-md border bg-muted/20 p-3 text-sm">
                 <div className="mb-2 flex items-center justify-between">
                   <h3 className="font-medium">Original order</h3>
-                  <StatusPill tone={statusTone(record.status)}>{STATUS_LABEL[record.status] ?? record.status}</StatusPill>
+                  <StatusPill tone={statusTone(record.status)}>
+                    {STATUS_LABEL[record.status] ?? record.status}
+                  </StatusPill>
                 </div>
                 <dl className="grid grid-cols-2 gap-2 text-xs">
                   <Field label="Order #" value={record.order_number} mono />
@@ -854,16 +890,40 @@ function ReturnInspectionSheet({
                               </div>
                             </TableCell>
                             <TableCell className="text-xs">{it.original_quantity}</TableCell>
-                            <TableCell><QtyInput value={it.returned_quantity} onCommit={(v) => updateItem(it, { returned_quantity: v })} /></TableCell>
-                            <TableCell><QtyInput value={it.missing_quantity} onCommit={(v) => updateItem(it, { missing_quantity: v })} /></TableCell>
-                            <TableCell><QtyInput value={it.damaged_quantity} onCommit={(v) => updateItem(it, { damaged_quantity: v })} /></TableCell>
-                            <TableCell><QtyInput value={it.wrong_quantity} onCommit={(v) => updateItem(it, { wrong_quantity: v })} /></TableCell>
+                            <TableCell>
+                              <QtyInput
+                                value={it.returned_quantity}
+                                onCommit={(v) => updateItem(it, { returned_quantity: v })}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <QtyInput
+                                value={it.missing_quantity}
+                                onCommit={(v) => updateItem(it, { missing_quantity: v })}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <QtyInput
+                                value={it.damaged_quantity}
+                                onCommit={(v) => updateItem(it, { damaged_quantity: v })}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <QtyInput
+                                value={it.wrong_quantity}
+                                onCommit={(v) => updateItem(it, { wrong_quantity: v })}
+                              />
+                            </TableCell>
                             <TableCell>
                               <Select
                                 value={it.inventory_action}
-                                onValueChange={(v) => updateItem(it, { inventory_action: v as ReturnItem["inventory_action"] })}
+                                onValueChange={(v) =>
+                                  updateItem(it, { inventory_action: v as ReturnItem["inventory_action"] })
+                                }
                               >
-                                <SelectTrigger className="h-7 w-[130px] text-xs"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-7 w-[130px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">No action</SelectItem>
                                   <SelectItem value="restock">Restock available</SelectItem>
@@ -876,55 +936,89 @@ function ReturnInspectionSheet({
                         );
                       })}
                       {!items.data?.length && (
-                        <TableRow><TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-4">No items linked.</TableCell></TableRow>
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-xs text-muted-foreground py-4">
+                            No items linked.
+                          </TableCell>
+                        </TableRow>
                       )}
                     </TableBody>
                   </Table>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Inventory updates are prepared per item. Sync with inventory will be enabled when the inventory module is connected.
+                  Inventory updates are prepared per item. Sync with inventory will be enabled when the inventory module
+                  is connected.
                 </p>
               </section>
 
               {/* Inspection form */}
               <section className="space-y-3">
-                <h3 className="text-sm font-medium flex items-center gap-1.5"><ClipboardCheck className="h-4 w-4" /> Inspection</h3>
+                <h3 className="text-sm font-medium flex items-center gap-1.5">
+                  <ClipboardCheck className="h-4 w-4" /> Inspection
+                </h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label>Return reason</Label>
                     <Select value={reason} onValueChange={setReason}>
-                      <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                        {REASONS.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Condition</Label>
                     <Select value={condition} onValueChange={setCondition}>
-                      <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {CONDITIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {CONDITIONS.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Status</Label>
                     <Select value={status} onValueChange={(v) => setStatus(v as ReturnStatus)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {STATUSES.map((s) => <SelectItem key={s} value={s}>{STATUS_LABEL[s]}</SelectItem>)}
+                        {STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {STATUS_LABEL[s]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Resolution note</Label>
-                    <Input value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="e.g. Refund issued #RF-…" />
+                    <Input
+                      value={resolution}
+                      onChange={(e) => setResolution(e.target.value)}
+                      placeholder="e.g. Refund issued #RF-…"
+                    />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Inspection notes</Label>
-                  <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What did you find on inspection?" />
+                  <Textarea
+                    rows={3}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="What did you find on inspection?"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Inspection photos</Label>
@@ -934,7 +1028,9 @@ function ReturnInspectionSheet({
                         {photoUrls[p.path] ? (
                           <img src={photoUrls[p.path]} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">…</div>
+                          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                            …
+                          </div>
                         )}
                         <button
                           type="button"
@@ -982,7 +1078,9 @@ function ReturnInspectionSheet({
 
               {/* Lifecycle timeline */}
               <section>
-                <h3 className="mb-3 text-sm font-medium flex items-center gap-1.5"><Clock className="h-4 w-4" /> Order lifecycle</h3>
+                <h3 className="mb-3 text-sm font-medium flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" /> Order lifecycle
+                </h3>
                 <LifecycleStages record={record} order={order.data} />
               </section>
 
@@ -1038,11 +1136,21 @@ function QtyInput({ value, onCommit }: { value: number; onCommit: (v: number) =>
   );
 }
 
-function LifecycleStages({ record, order }: { record: ReturnRecord; order: { ordered_at?: string | null; packing_status?: string | null; shipping_status?: string | null } | null | undefined }) {
+function LifecycleStages({
+  record,
+  order,
+}: {
+  record: ReturnRecord;
+  order:
+    | { ordered_at?: string | null; packing_status?: string | null; shipping_status?: string | null }
+    | null
+    | undefined;
+}) {
   const reached: Record<string, string | null> = {
     order_created: order?.ordered_at ?? null,
     packed: record.packing_date,
-    shipped: order?.shipping_status === "shipped" || order?.shipping_status === "delivered" ? record.packing_date : null,
+    shipped:
+      order?.shipping_status === "shipped" || order?.shipping_status === "delivered" ? record.packing_date : null,
     delivered: order?.shipping_status === "delivered" ? record.packing_date : null,
     returned: record.received_at,
     inspection: record.inspection_date,
@@ -1055,7 +1163,9 @@ function LifecycleStages({ record, order }: { record: ReturnRecord; order: { ord
         const done = !!at;
         return (
           <li key={s.key} className="flex items-center gap-3 text-sm">
-            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${done ? "bg-success text-success-foreground" : "bg-muted text-muted-foreground"}`}>
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${done ? "bg-success text-success-foreground" : "bg-muted text-muted-foreground"}`}
+            >
               {done ? "✓" : "·"}
             </span>
             <span className={done ? "" : "text-muted-foreground"}>{s.label}</span>
