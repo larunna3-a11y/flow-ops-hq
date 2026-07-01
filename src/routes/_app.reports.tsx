@@ -110,21 +110,15 @@ function ReportsPage() {
   const { data: allReturns = [] } = useReturns();
 
   // ── Live summary — synchronized with the Dashboard's own data source ──────
-  // Sources mirror the Dashboard exactly:
-  //   totalOrders / pendingOrders → useOrderCounts()  (range-free, shared cache)
-  //   packedOrders / shippedOrders / returnedOrders   → useDashboardStats()
-  //   todayOrders                                     → usePackingProgress()
-  // All three hooks share query keys with Dashboard, so any mutation that
-  // invalidates ["order_counts"] / ["dashboard_stats"] / ["packing_progress"]
-  // refreshes both pages simultaneously.
-  const orderCounts = useOrderCounts();
+  // Same hooks, same aggregate queries, same business rules as the Dashboard,
+  // so these numbers are always consistent across both pages.
   const dashboardStats = useDashboardStats();
   const packingProgress = usePackingProgress();
   const liveSummary = {
-    totalOrders: orderCounts.data?.totalOrders ?? 0, // ← was dashboardStats (undefined field)
+    totalOrders: dashboardStats.data?.totalOrders ?? 0,
     todayOrders: packingProgress.data?.todayOrders ?? 0,
-    pendingOrders: orderCounts.data?.pendingOrders ?? 0, // ← was dashboardStats (undefined field)
-    packedOrders: dashboardStats.data?.packedOrders ?? 0, // ← was packingProgress (today-scoped only)
+    pendingOrders: dashboardStats.data?.pendingOrders ?? 0,
+    packedOrders: packingProgress.data?.packedOrders ?? 0,
     shippedOrders: dashboardStats.data?.shippedOrders ?? 0,
     returnedOrders: dashboardStats.data?.totalReturns ?? 0,
   };

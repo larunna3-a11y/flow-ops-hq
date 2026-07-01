@@ -42,7 +42,7 @@ import { usePackingRecords } from "@/lib/use-warehouse-data";
 import { logActivity } from "@/lib/activity.functions";
 import { notify } from "@/lib/notify";
 import { detect, type DetectionResult } from "@/lib/detection";
-import { MARKETPLACES, COURIERS, useDashboardStats, useOrderCounts } from "@/lib/use-orders-data";
+import { MARKETPLACES, COURIERS, useDashboardStats } from "@/lib/use-orders-data";
 
 export const Route = createFileRoute("/_app/packing")({
   head: () => ({
@@ -139,28 +139,23 @@ function PackingPage() {
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
 
-  /*
+  /**
    * KPIs are derived from the SAME source of truth as the Dashboard:
-   * - totalOrders / pendingOrders (inQueue) come from useOrderCounts()
-   *   — range-free, shared cache key ["order_counts", wid], identical to
-   *   what Dashboard's KPI cards consume.
-   * - packedOrders comes from useDashboardStats() which counts packing_records
-   *   with status = 'Packed' via server-side COUNT (no row limit).
-   * This guarantees Dashboard's "Total Orders" / "Pending Orders" and Packing's
-   * "Total Orders" / "In Queue" always show identical numbers.
-   * After every confirmPacking or deleteRecord we invalidate both
-   * `order_counts` and `dashboard_stats` so all pages refresh atomically.
+   *   pendingOrders / totalOrders / packedOrders come from useDashboardStats
+   *   which runs server-side COUNTs against the orders table.
+   * This guarantees Dashboard's "Pending Orders" and Packing's "In Queue"
+   * always show identical numbers. After every confirmPacking we invalidate
+   * `dashboard_stats` and `orders`, so both widgets refresh automatically.
    */
-
-  const orderCounts = useOrderCounts();
   const dashboardStats = useDashboardStats();
   const kpis = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
     const todayRecords = records.filter((r) => r.created_at >= todayIso);
-    const totalOrders = orderCounts.data?.totalOrders ?? 0;
-    const inQueue = orderCounts.data?.pendingOrders ?? 0;
+
+    const totalOrders = dashboardStats.data?.totalOrders ?? 0;
+    const inQueue = dashboardStats.data?.pendingOrders ?? 0;
     const packedOrders = dashboardStats.data?.packedOrders ?? 0;
     const packProgress = totalOrders > 0 ? Math.round((packedOrders / totalOrders) * 100) : 0;
 
@@ -544,7 +539,6 @@ function PackingPage() {
 
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
-      qc.invalidateQueries({ queryKey: ["order_counts"] }); // ← ADDED: keeps Dashboard "Pending Orders" in sync
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["packing_progress"] });
@@ -552,7 +546,6 @@ function PackingPage() {
       qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
       qc.invalidateQueries({ queryKey: ["audit_logs"] });
-
       resetScan();
     } finally {
       setSubmitting(false);
@@ -575,13 +568,11 @@ function PackingPage() {
       toast.success("Packing record deleted.");
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
-      qc.invalidateQueries({ queryKey: ["order_counts"] }); // ← ADDED
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] }); // ← ADDED
-      qc.invalidateQueries({ queryKey: ["today_packers"] }); // ← ADDED
-      qc.invalidateQueries({ queryKey: ["packing_exceptions"] }); // ← ADDED
-      qc.invalidateQueries({ queryKey: ["audit_logs"] }); // ← ADDED
+      qc.invalidateQueries({ queryKey: ["packing_progress"] });
+      qc.invalidateQueries({ queryKey: ["today_packers"] });
+      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
