@@ -544,6 +544,7 @@ function PackingPage() {
 
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order_counts"] }); // ← ADDED: keeps Dashboard "Pending Orders" in sync
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["packing_progress"] });
@@ -551,6 +552,7 @@ function PackingPage() {
       qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
       qc.invalidateQueries({ queryKey: ["audit_logs"] });
+
       resetScan();
     } finally {
       setSubmitting(false);
