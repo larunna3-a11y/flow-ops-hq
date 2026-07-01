@@ -151,9 +151,6 @@ function PackingPage() {
    * After every confirmPacking or deleteRecord we invalidate both
    * `order_counts` and `dashboard_stats` so all pages refresh atomically.
    */
-  // Before:
-  import { useDashboardStats, useImports, usePackingProgress, useOrderCounts } from "@/lib/use-orders-data";
-  // (already imported on the packing page — confirm it's there, add if missing)
 
   const orderCounts = useOrderCounts();
   const dashboardStats = useDashboardStats();
