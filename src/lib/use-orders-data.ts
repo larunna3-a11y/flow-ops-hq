@@ -72,12 +72,9 @@ export type ImportBatch = {
   created_at: string;
 };
 
-export type OrderCounts = {
+export type DashboardStats = {
   totalOrders: number;
   pendingOrders: number;
-};
-
-export type DashboardStats = {
   packedOrders: number;
   shippedOrders: number;
   totalReturns: number;
@@ -120,67 +117,10 @@ export function useStores() {
 }
 
 /**
- * Single source of truth for "how many orders were packed" in a given
- * window. Counts `packing_records` rows with status = 'Packed' — the exact
- * same definition used to build the "Today's Packers" list — so every
- * dashboard widget that shows a "Packed" number is always counting the
- * same thing the same way.
- */
-async function fetchPackedOrdersCount(workspaceId: string, range?: { from: string; to: string }): Promise<number> {
-  let q = db
-    .from("packing_records")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId)
-    .eq("status", "Packed");
-  if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
-  const { count } = await q;
-  return count ?? 0;
-}
-
-/**
- * Range-independent order counts — the single shared cache entry for
- * "Total Orders" and "Pending Orders" consumed by BOTH:
- *   - Dashboard KPI cards ("Total Orders", "Pending Orders")
- *   - Packing page KPI tiles ("Total Orders", "In Queue")
- *
- * Key is ["order_counts", wid] — never includes a range — so no matter
- * what date preset the Dashboard has selected, this entry is identical
- * to what the Packing page reads. Invalidating ["order_counts"] from
- * either page refreshes both simultaneously.
- *
- * pendingOrders = COUNT(orders NOT IN done-states) — a direct DB query,
- * never derived from totalOrders minus a range-scoped packed count.
- */
-export function useOrderCounts() {
-  const ws = useWorkspace();
-  const wid = ws.data?.workspace?.id;
-  return useQuery({
-    queryKey: ["order_counts", wid],
-    enabled: !!wid,
-    queryFn: async () => {
-      const [totalRes, pendingRes] = await Promise.all([
-        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
-        db
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wid)
-          .not("packing_status", "in", '("packed","packed_with_missing","shipped","delivered","returned","cancelled")'),
-      ]);
-      return {
-        totalOrders: totalRes.count ?? 0,
-        pendingOrders: pendingRes.count ?? 0,
-      };
-    },
-  });
-}
-
-/**
  * Aggregate dashboard stats using server-side COUNT queries.
  * Never loads full rows — safe for any dataset size.
- * Accepts a date range to scope time-sensitive stats (packed, shipped,
- * returns, active packers). totalOrders and pendingOrders are NOT included
- * here — they live in useOrderCounts() with a stable range-free key so
- * both Dashboard and Packing page always share one cache entry for those.
+ * Accepts an optional date range (from/to ISO strings) to scope
+ * time-sensitive stats; totalOrders always counts all orders.
  */
 export function useDashboardStats(range?: { from: string; to: string }) {
   const ws = useWorkspace();
@@ -189,13 +129,38 @@ export function useDashboardStats(range?: { from: string; to: string }) {
     queryKey: ["dashboard_stats", wid, range],
     enabled: !!wid,
     queryFn: async () => {
-      // Run all aggregate queries in parallel for speed.
-      const [packedOrders, shippedOrdersRes, totalReturnsRes, activePackersRes, activeUsersRes] = await Promise.all([
-        // Packed orders — packing_records with status = 'Packed', scoped to range.
-        // Single source of truth shared with usePackingProgress / useTodayPackers.
-        fetchPackedOrdersCount(wid as string, range),
+      // Run all aggregate queries in parallel for speed
+      const [
+        totalOrdersRes,
+        pendingOrdersRes,
+        packedOrdersRes,
+        shippedOrdersRes,
+        totalReturnsRes,
+        activePackersRes,
+        activeUsersRes,
+      ] = await Promise.all([
+        // Total orders — always all orders, no date filter
+        db.from("orders").select("id", { count: "exact", head: true }).eq("workspace_id", wid),
 
-        // Shipped orders — scoped to range when provided.
+        // Pending = packing_status eq 'pending'
+        db
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .eq("packing_status", "pending"),
+
+        // Packed orders in range
+        (() => {
+          let q = db
+            .from("orders")
+            .select("id", { count: "exact", head: true })
+            .eq("workspace_id", wid)
+            .eq("packing_status", "packed");
+          if (range) q = q.gte("updated_at", range.from).lte("updated_at", range.to);
+          return q;
+        })(),
+
+        // Shipped orders in range
         (() => {
           let q = db
             .from("orders")
@@ -206,14 +171,14 @@ export function useDashboardStats(range?: { from: string; to: string }) {
           return q;
         })(),
 
-        // Total returns — scoped to range when provided.
+        // Total returns in range
         (() => {
           let q = db.from("returns").select("id", { count: "exact", head: true }).eq("workspace_id", wid);
           if (range) q = q.gte("created_at", range.from).lte("created_at", range.to);
           return q;
         })(),
 
-        // Active packers = distinct user_ids in packing_records in range.
+        // Active packers = distinct user_ids in packing_records in range
         (() => {
           let q = db
             .from("packing_records")
@@ -224,7 +189,7 @@ export function useDashboardStats(range?: { from: string; to: string }) {
           return q;
         })(),
 
-        // Active users = distinct actors in audit_logs today (always today, not range).
+        // Active users = distinct actors in audit_logs today
         (() => {
           const todayStart = new Date();
           todayStart.setHours(0, 0, 0, 0);
@@ -237,19 +202,21 @@ export function useDashboardStats(range?: { from: string; to: string }) {
         })(),
       ]);
 
-      // Distinct active packers (deduplicate user_ids client-side from small result).
+      // Distinct active packers (deduplicate user_ids client-side from small result)
       const activePackers = new Set((activePackersRes.data ?? []).map((r: { user_id: string }) => r.user_id)).size;
 
-      // Distinct active users.
+      // Distinct active users
       const activeUsers = new Set((activeUsersRes.data ?? []).map((r: { actor_id: string }) => r.actor_id)).size;
 
       return {
-        packedOrders,
+        totalOrders: totalOrdersRes.count ?? 0,
+        pendingOrders: pendingOrdersRes.count ?? 0,
+        packedOrders: packedOrdersRes.count ?? 0,
         shippedOrders: shippedOrdersRes.count ?? 0,
         totalReturns: totalReturnsRes.count ?? 0,
         activePackers,
         activeUsers,
-      };
+      } as DashboardStats;
     },
   });
 }
@@ -263,19 +230,15 @@ export function useDashboardStats(range?: { from: string; to: string }) {
  * - todayOrders   = orders imported (created_at) today only. Resets automatically
  *                   at local midnight since it's derived from "now" on every fetch;
  *                   historical orders are never deleted or modified.
+ * - pendingOrders = ALL orders with packing_status = 'pending', regardless of the
+ *                   day they were imported (carries over unfinished work).
  * - packedOrders  = SUM(all successful packing confirmations today) across EVERY
  *                   packer in the workspace — i.e. count of packing_records with
  *                   status = 'Packed' and created_at today, workspace-wide (never
  *                   scoped to a single user). This is the exact same query
- *                   (workspace_id + status='Packed' + today), via the shared
- *                   fetchPackedOrdersCount() helper, used to build the
- *                   "Today's Packers" list in useTodayPackers() and the top
- *                   dashboard "Packed" KPI in useDashboardStats(), so this number
+ *                   (workspace_id + status='Packed' + today) used to build the
+ *                   "Today's Packers" list in useTodayPackers(), so this number
  *                   always equals the sum of every packer's count shown there.
- * - pendingOrders = todayOrders - packedOrders. Always derived from the same two
- *                   numbers shown elsewhere on this widget — never queried via a
- *                   separate packing_status = 'pending' filter — so it can never
- *                   drift out of sync with what's actually been packed.
  * - packingProgress = packedOrders / todayOrders * 100 (capped at 100, 0 when no
  *                   orders were imported today).
  */
@@ -291,24 +254,35 @@ export function usePackingProgress() {
       todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
-      const todayRange = { from: todayStart.toISOString(), to: todayEnd.toISOString() };
 
-      const [todayOrdersRes, packedOrders] = await Promise.all([
+      const [todayOrdersRes, pendingOrdersRes, packedOrdersRes] = await Promise.all([
         db
           .from("orders")
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", wid)
-          .gte("created_at", todayRange.from)
-          .lte("created_at", todayRange.to),
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString()),
+
+        db
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .eq("packing_status", "pending"),
 
         // Workspace-wide count of successful packing confirmations made today,
-        // across ALL packers — never filtered to a single user. Shared helper
-        // keeps this identical to useDashboardStats() and useTodayPackers().
-        fetchPackedOrdersCount(wid as string, todayRange),
+        // across ALL packers — never filtered to a single user.
+        db
+          .from("packing_records")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wid)
+          .eq("status", "Packed")
+          .gte("created_at", todayStart.toISOString())
+          .lte("created_at", todayEnd.toISOString()),
       ]);
 
       const todayOrders = todayOrdersRes.count ?? 0;
-      const pendingOrders = Math.max(0, todayOrders - packedOrders);
+      const pendingOrders = pendingOrdersRes.count ?? 0;
+      const packedOrders = packedOrdersRes.count ?? 0;
       const packingProgress = todayOrders > 0 ? Math.min(100, Math.round((packedOrders / todayOrders) * 1000) / 10) : 0;
 
       return { todayOrders, pendingOrders, packedOrders, packingProgress } as PackingProgressStats;
