@@ -575,11 +575,13 @@ function PackingPage() {
       toast.success("Packing record deleted.");
       qc.invalidateQueries({ queryKey: ["packing_records"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
+      qc.invalidateQueries({ queryKey: ["order_counts"] }); // ← ADDED
       qc.invalidateQueries({ queryKey: ["dashboard_stats"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["packing_progress"] });
-      qc.invalidateQueries({ queryKey: ["today_packers"] });
-      qc.invalidateQueries({ queryKey: ["packing_exceptions"] });
+      qc.invalidateQueries({ queryKey: ["packing_progress"] }); // ← ADDED
+      qc.invalidateQueries({ queryKey: ["today_packers"] }); // ← ADDED
+      qc.invalidateQueries({ queryKey: ["packing_exceptions"] }); // ← ADDED
+      qc.invalidateQueries({ queryKey: ["audit_logs"] }); // ← ADDED
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
