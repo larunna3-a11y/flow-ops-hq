@@ -322,16 +322,13 @@ function DashboardPage() {
       />
 
       {/* Single KPI row — aggregate queries, no row limits.
-          Pending and Packed both come from the same useDashboardStats() call:
-          packedOrders is counted once (packing_records, status='Packed'), and
-          pendingOrders = totalOrders - packedOrders. The Packing Progress
-          widget below uses the same packedOrders definition (scoped to today)
-          via usePackingProgress(), so every "Packed"/"Pending" number on this
-          page always agrees. */}
+          "Packed" is sourced from `progress.packedOrders` (usePackingProgress),
+          the same workspace-wide, all-packers, today-only count that drives the
+          Packing Progress widget and equals the sum of Today's Packers below. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-7">
         <StatCard label="Total Orders" value={String(stats.totalOrders)} icon={<ShoppingCart className="h-4 w-4" />} />
         <StatCard label="Pending Orders" value={String(stats.pendingOrders)} icon={<Truck className="h-4 w-4" />} />
-        <StatCard label="Packed" value={String(stats.packedOrders)} icon={<PackageCheck className="h-4 w-4" />} />
+        <StatCard label="Packed" value={String(progress.packedOrders)} icon={<PackageCheck className="h-4 w-4" />} />
         <StatCard label="Shipped" value={String(stats.shippedOrders)} icon={<Truck className="h-4 w-4" />} />
         <StatCard label="Total Returns" value={String(stats.totalReturns)} icon={<RotateCcw className="h-4 w-4" />} />
         <StatCard label="Active Packers" value={String(stats.activePackers)} icon={<Users className="h-4 w-4" />} />
