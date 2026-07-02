@@ -493,7 +493,7 @@ function UsersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {(["Supervisor", "Packer", "Return Staff"] as AppRole[]).map((r) => (
+                        {(["Supervisor", "Packer", "Return Staff", "Monitor"] as AppRole[]).map((r) => (
                           <DropdownMenuItem
                             key={r}
                             disabled={u.role === r}
