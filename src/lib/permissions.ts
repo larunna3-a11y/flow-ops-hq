@@ -33,6 +33,8 @@ const ROLE_MODULES: Record<AppRole, ModuleKey[]> = {
   Packer: ["packing"],
   // Return Staff: Returns only.
   "Return Staff": ["returns"],
+  // Monitor: read-only observer. Dashboard, Packing, Returns, Reports, Users, Imports.
+  Monitor: ["dashboard", "packing", "returns", "reports", "users", "imports"],
 };
 
 // Landing route per role after sign-in / when blocked from a module.
@@ -41,6 +43,7 @@ export const HOME_PATH: Record<AppRole, string> = {
   Supervisor: "/dashboard",
   Packer: "/packing",
   "Return Staff": "/returns",
+  Monitor: "/dashboard",
 };
 
 export function canAccess(role: AppRole | null | undefined, module: ModuleKey): boolean {
