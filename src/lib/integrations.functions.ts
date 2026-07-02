@@ -173,8 +173,8 @@ export const connectConnection = createServerFn({ method: "POST" })
       connectionId: row.id,
       workspaceId: row.workspace_id,
       connectorKey: row.connector_key,
-      credentials: row.credentials ?? {},
-      oauthTokens: row.oauth_tokens ?? {},
+      credentials: (row.credentials as Record<string, unknown>) ?? {},
+      oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
     });
 
     await context.supabase.from("connector_connections").update({
@@ -206,8 +206,8 @@ export const disconnectConnection = createServerFn({ method: "POST" })
         connectionId: row.id,
         workspaceId: row.workspace_id,
         connectorKey: row.connector_key,
-        credentials: row.credentials ?? {},
-        oauthTokens: row.oauth_tokens ?? {},
+        credentials: (row.credentials as Record<string, unknown>) ?? {},
+        oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
       });
     }
     await context.supabase.from("connector_connections").update({
@@ -247,8 +247,8 @@ export const runSync = createServerFn({ method: "POST" })
         connectionId: row.id,
         workspaceId: row.workspace_id,
         connectorKey: row.connector_key,
-        credentials: row.credentials ?? {},
-        oauthTokens: row.oauth_tokens ?? {},
+        credentials: (row.credentials as Record<string, unknown>) ?? {},
+        oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
       });
 
       await context.supabase.from("sync_runs").update({
