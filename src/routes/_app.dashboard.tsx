@@ -93,7 +93,7 @@ function DashboardPage() {
 
   // Live Packing Progress widget — independent of the date-range preset above,
   // always reflects "today" per the business rules (Owner/Supervisor only).
-  const isOwnerOrSupervisor = ws.data?.role === "Owner" || ws.data?.role === "Supervisor";
+  const isOwnerOrSupervisor = ws.data?.role === "Owner" || ws.data?.role === "Supervisor" || ws.data?.role === "Monitor";
   const packingProgress = usePackingProgress();
   const todayPackers = useTodayPackers();
 
