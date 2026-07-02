@@ -1607,7 +1607,7 @@ export type Database = {
       touch_last_login: { Args: never; Returns: undefined }
     }
     Enums: {
-      app_role: "Owner" | "Supervisor" | "Packer" | "Return Staff"
+      app_role: "Owner" | "Supervisor" | "Packer" | "Return Staff" | "Monitor"
       invitation_status: "pending" | "accepted" | "revoked" | "expired"
       member_status: "active" | "invited" | "suspended"
     }
@@ -1737,7 +1737,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["Owner", "Supervisor", "Packer", "Return Staff"],
+      app_role: ["Owner", "Supervisor", "Packer", "Return Staff", "Monitor"],
       invitation_status: ["pending", "accepted", "revoked", "expired"],
       member_status: ["active", "invited", "suspended"],
     },
