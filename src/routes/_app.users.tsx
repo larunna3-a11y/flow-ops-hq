@@ -86,7 +86,7 @@ type Invitation = {
   account_expires_at: string | null;
 };
 
-type InviteRole = "Packer" | "Return Staff" | "Supervisor";
+type InviteRole = "Packer" | "Return Staff" | "Supervisor" | "Monitor";
 
 const EXPIRATION_OPTIONS: { label: string; days: number | null }[] = [
   { label: "1 Day", days: 1 },
