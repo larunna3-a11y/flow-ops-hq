@@ -103,7 +103,7 @@ export const createConnection = createServerFn({ method: "POST" })
         connection_status: "disconnected",
         created_by: context.userId,
       })
-      .select("*")
+      .select(CONNECTION_SAFE_COLUMNS)
       .single();
     if (error) throw error;
     return row;
