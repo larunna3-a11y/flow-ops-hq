@@ -387,59 +387,61 @@ function ReturnsPage() {
         actions={
           <>
             <Button variant="outline" size="sm">{t("common.export")}</Button>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">{t("returns.newRma")}</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>New return</DialogTitle>
-                  <DialogDescription>Record an incoming RMA from a marketplace.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label>Return number</Label>
-                    <Input value={form.return_number} onChange={(e) => setForm({ ...form, return_number: e.target.value })} placeholder="RMA-44126" />
+            {ws.data?.role !== "Monitor" && (
+              <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm">{t("returns.newRma")}</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>New return</DialogTitle>
+                    <DialogDescription>Record an incoming RMA from a marketplace.</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label>Return number</Label>
+                      <Input value={form.return_number} onChange={(e) => setForm({ ...form, return_number: e.target.value })} placeholder="RMA-44126" />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Order number</Label>
+                        <Input value={form.order_number} onChange={(e) => setForm({ ...form, order_number: e.target.value })} placeholder="INV/…/MPL/…" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Tracking number</Label>
+                        <Input value={form.tracking_number} onChange={(e) => setForm({ ...form, tracking_number: e.target.value })} placeholder="JNE…" />
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label>Marketplace</Label>
+                        <Select value={form.marketplace} onValueChange={(v) => setForm({ ...form, marketplace: v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Reason</Label>
+                        <Select value={form.reason} onValueChange={(v) => setForm({ ...form, reason: v })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {REASONS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label>Order number</Label>
-                      <Input value={form.order_number} onChange={(e) => setForm({ ...form, order_number: e.target.value })} placeholder="INV/…/MPL/…" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Tracking number</Label>
-                      <Input value={form.tracking_number} onChange={(e) => setForm({ ...form, tracking_number: e.target.value })} placeholder="JNE…" />
-                    </div>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label>Marketplace</Label>
-                      <Select value={form.marketplace} onValueChange={(v) => setForm({ ...form, marketplace: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {MARKETPLACES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Reason</Label>
-                      <Select value={form.reason} onValueChange={(v) => setForm({ ...form, reason: v })}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {REASONS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button onClick={createManualReturn} disabled={saving}>
-                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Create return
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                  <DialogFooter>
+                    <Button onClick={createManualReturn} disabled={saving}>
+                      {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                      Create return
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
           </>
         }
       />
