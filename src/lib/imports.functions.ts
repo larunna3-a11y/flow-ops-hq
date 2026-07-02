@@ -68,9 +68,6 @@ export const deleteImportBatch = createServerFn({ method: "POST" })
     if (byImportErr) throw new Error(byImportErr.message);
     orderRows = byImportId ?? [];
 
-console.log("Import ID:", importId);
-console.log("Orders found by import_id:", orderRows.length);
-
     if (orderRows.length === 0) {
       const createdAt = new Date(imp.created_at).getTime();
       const from = new Date(createdAt - 5 * 60_000).toISOString();
@@ -81,12 +78,8 @@ console.log("Orders found by import_id:", orderRows.length);
         .eq("workspace_id", workspaceId)
         .is("import_id", null)
         .gte("created_at", from)
-        console.log("Orders found by time window:", orderRows.length);
         .lte("created_at", to);
       if (byWindowErr) throw new Error(byWindowErr.message);
-      console.log("Orders to delete:", orderIds.length);
-console.log("Order Numbers:", orderNumbers.length);
-console.log("Tracking Numbers:", trackingNumbers.length);
       orderRows = byWindow ?? [];
     }
 
