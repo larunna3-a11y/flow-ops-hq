@@ -354,7 +354,7 @@ function UsersPage() {
       <PageHeader
         title={t("users.title")}
         description={t("users.description")}
-        actions={
+        actions={ws?.role === "Monitor" ? null : (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" disabled={!isOwner}>
