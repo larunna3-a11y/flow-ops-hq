@@ -143,8 +143,18 @@ export const deleteConnection = createServerFn({ method: "POST" })
   });
 
 // ─────────────────────── Connect / Authenticate / Disconnect ───────
-async function loadConnection(supabase: AnyDb, id: string) {
-  const { data, error } = await supabase.from("connector_connections").select("*").eq("id", id).single();
+// Loads a connection row INCLUDING secret columns. Uses the service-role
+// client because `credentials` / `oauth_tokens` SELECTs are revoked from
+// the `authenticated` role. Callers must have already asserted Owner
+// membership for the current workspace.
+async function loadConnection(id: string, workspaceId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("connector_connections")
+    .select("*")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .single();
   if (error) throw error;
   return data;
 }
