@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/page-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusPill, statusToTone } from "@/components/status-pill";
@@ -10,6 +11,7 @@ import { useImports } from "@/lib/use-orders-data";
 import { useWorkspace, useCurrentUser } from "@/lib/use-workspace";
 import { supabase } from "@/integrations/supabase/client";
 import { parseDestyFile, type DestyParseResult } from "@/lib/desty-parser";
+import { deleteImportBatch } from "@/lib/imports.functions";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, CheckCircle2, Loader2, Trash2 } from "lucide-react";
 import {
