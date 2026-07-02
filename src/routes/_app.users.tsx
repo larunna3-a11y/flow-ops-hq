@@ -422,7 +422,7 @@ function UsersPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        }
+        )}
       />
 
       <div className="rounded-lg border bg-card shadow-card">
