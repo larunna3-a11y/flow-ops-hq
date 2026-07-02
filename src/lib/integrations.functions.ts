@@ -58,12 +58,18 @@ export const listAvailableConnectors = createServerFn({ method: "GET" })
   });
 
 // ─────────────────────── Connections CRUD ───────────────────
+// Non-secret columns exposed to clients. `credentials` and `oauth_tokens`
+// are intentionally excluded — those live server-side only and are read
+// via the admin client inside protected handlers below.
+const CONNECTION_SAFE_COLUMNS =
+  "id, workspace_id, connector_key, display_name, store_id, connection_status, auto_sync, sync_interval_minutes, last_sync_at, last_sync_status, last_error, last_error_at, created_by, created_at, updated_at";
+
 export const listConnections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("connector_connections")
-      .select("*")
+      .select(CONNECTION_SAFE_COLUMNS)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
