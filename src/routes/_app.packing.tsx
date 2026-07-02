@@ -659,7 +659,7 @@ function PackingPage() {
       </div>
 
       {/* ── Scan input ─────────────────────────────────────────────────────── */}
-      {!scan.editingRecordId && (
+      {!isReadOnly && !scan.editingRecordId && (
         <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
             <div className="space-y-1.5">
