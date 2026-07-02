@@ -596,14 +596,16 @@ function PackingPage() {
         title={t("packing.title")}
         description={t("packing.description")}
         actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
-              <Camera className="h-4 w-4" /> Camera
-            </Button>
-            <Button size="sm" onClick={() => codeRef.current?.focus()}>
-              <ScanLine className="h-4 w-4" /> Focus scanner
-            </Button>
-          </>
+          isReadOnly ? null : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
+                <Camera className="h-4 w-4" /> Camera
+              </Button>
+              <Button size="sm" onClick={() => codeRef.current?.focus()}>
+                <ScanLine className="h-4 w-4" /> Focus scanner
+              </Button>
+            </>
+          )
         }
       />
 
