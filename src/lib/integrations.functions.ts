@@ -58,12 +58,18 @@ export const listAvailableConnectors = createServerFn({ method: "GET" })
   });
 
 // ─────────────────────── Connections CRUD ───────────────────
+// Non-secret columns exposed to clients. `credentials` and `oauth_tokens`
+// are intentionally excluded — those live server-side only and are read
+// via the admin client inside protected handlers below.
+const CONNECTION_SAFE_COLUMNS =
+  "id, workspace_id, connector_key, display_name, store_id, connection_status, auto_sync, sync_interval_minutes, last_sync_at, last_sync_status, last_error, last_error_at, created_by, created_at, updated_at";
+
 export const listConnections = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("connector_connections")
-      .select("*")
+      .select(CONNECTION_SAFE_COLUMNS)
       .order("created_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
@@ -97,7 +103,7 @@ export const createConnection = createServerFn({ method: "POST" })
         connection_status: "disconnected",
         created_by: context.userId,
       })
-      .select("*")
+      .select(CONNECTION_SAFE_COLUMNS)
       .single();
     if (error) throw error;
     return row;
@@ -137,8 +143,18 @@ export const deleteConnection = createServerFn({ method: "POST" })
   });
 
 // ─────────────────────── Connect / Authenticate / Disconnect ───────
-async function loadConnection(supabase: AnyDb, id: string) {
-  const { data, error } = await supabase.from("connector_connections").select("*").eq("id", id).single();
+// Loads a connection row INCLUDING secret columns. Uses the service-role
+// client because `credentials` / `oauth_tokens` SELECTs are revoked from
+// the `authenticated` role. Callers must have already asserted Owner
+// membership for the current workspace.
+async function loadConnection(id: string, workspaceId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("connector_connections")
+    .select("*")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .single();
   if (error) throw error;
   return data;
 }
@@ -149,7 +165,7 @@ export const connectConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
     await assertOwner(context.supabase, context.userId, wid);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     const connector = getConnector(row.connector_key);
     if (!connector) throw new Error("Unknown connector");
 
@@ -157,8 +173,8 @@ export const connectConnection = createServerFn({ method: "POST" })
       connectionId: row.id,
       workspaceId: row.workspace_id,
       connectorKey: row.connector_key,
-      credentials: row.credentials ?? {},
-      oauthTokens: row.oauth_tokens ?? {},
+      credentials: (row.credentials as Record<string, unknown>) ?? {},
+      oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
     });
 
     await context.supabase.from("connector_connections").update({
@@ -183,15 +199,15 @@ export const disconnectConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
     await assertOwner(context.supabase, context.userId, wid);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     const connector = getConnector(row.connector_key);
     if (connector) {
       await connector.disconnect({
         connectionId: row.id,
         workspaceId: row.workspace_id,
         connectorKey: row.connector_key,
-        credentials: row.credentials ?? {},
-        oauthTokens: row.oauth_tokens ?? {},
+        credentials: (row.credentials as Record<string, unknown>) ?? {},
+        oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
       });
     }
     await context.supabase.from("connector_connections").update({
@@ -207,7 +223,7 @@ export const runSync = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; trigger?: SyncTrigger }) => d)
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     if (row.workspace_id !== wid) throw new Error("Forbidden");
     const connector = getConnector(row.connector_key);
     if (!connector) throw new Error("Unknown connector");
@@ -231,8 +247,8 @@ export const runSync = createServerFn({ method: "POST" })
         connectionId: row.id,
         workspaceId: row.workspace_id,
         connectorKey: row.connector_key,
-        credentials: row.credentials ?? {},
-        oauthTokens: row.oauth_tokens ?? {},
+        credentials: (row.credentials as Record<string, unknown>) ?? {},
+        oauthTokens: (row.oauth_tokens as Record<string, unknown>) ?? {},
       });
 
       await context.supabase.from("sync_runs").update({
