@@ -50,7 +50,7 @@ export const createPhoneInvitation = createServerFn({ method: "POST" })
     const fullName = (data.fullName ?? "").trim() || null;
     const phone = normalisePhone(data.phone);
     if (!phone || phone.replace(/\D/g, "").length < 7) throw new Error("Invalid phone number");
-    if (!["Packer", "Return Staff", "Supervisor"].includes(data.role))
+    if (!["Packer", "Return Staff", "Supervisor", "Monitor"].includes(data.role))
       throw new Error("Invalid role");
 
     const linkValidDays = data.invitationValidDays ?? 14;
@@ -120,7 +120,7 @@ export const createBulkPhoneInvitations = createServerFn({ method: "POST" })
     const { userId, supabase } = context;
     const workspaceId = await assertOwner(supabase, userId);
 
-    if (!["Packer", "Return Staff", "Supervisor"].includes(data.role))
+    if (!["Packer", "Return Staff", "Supervisor", "Monitor"].includes(data.role))
       throw new Error("Invalid role");
 
     const linkValidDays = data.invitationValidDays ?? 14;
