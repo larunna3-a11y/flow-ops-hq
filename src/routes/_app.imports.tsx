@@ -39,6 +39,7 @@ function ImportsPage() {
   const ws = useWorkspace();
   const user = useCurrentUser();
   const qc = useQueryClient();
+  const deleteImportFn = useServerFn(deleteImportBatch);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [parsing, setParsing] = useState(false);
