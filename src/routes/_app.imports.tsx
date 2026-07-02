@@ -52,6 +52,8 @@ function ImportsPage() {
 
   const role = ws.data?.role ?? null;
   const canDelete = role === "Owner" || role === "Supervisor";
+  // Monitor is a read-only observer — it may view the import history but cannot upload files.
+  const canUpload = role !== "Monitor";
 
   async function onFileChosen(file: File) {
     setParsing(true);
