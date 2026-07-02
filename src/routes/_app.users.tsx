@@ -395,6 +395,7 @@ function UsersPage() {
                         <SelectItem value="Packer">Packer</SelectItem>
                         <SelectItem value="Return Staff">Return Staff</SelectItem>
                         <SelectItem value="Supervisor">Supervisor</SelectItem>
+                        <SelectItem value="Monitor">Monitor (read-only)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
