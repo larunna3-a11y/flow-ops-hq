@@ -165,7 +165,7 @@ export const connectConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
     await assertOwner(context.supabase, context.userId, wid);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     const connector = getConnector(row.connector_key);
     if (!connector) throw new Error("Unknown connector");
 
@@ -199,7 +199,7 @@ export const disconnectConnection = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
     await assertOwner(context.supabase, context.userId, wid);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     const connector = getConnector(row.connector_key);
     if (connector) {
       await connector.disconnect({
@@ -223,7 +223,7 @@ export const runSync = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; trigger?: SyncTrigger }) => d)
   .handler(async ({ data, context }) => {
     const wid = await getWorkspaceId(context.supabase, context.userId);
-    const row = await loadConnection(context.supabase, data.id);
+    const row = await loadConnection(data.id, wid);
     if (row.workspace_id !== wid) throw new Error("Forbidden");
     const connector = getConnector(row.connector_key);
     if (!connector) throw new Error("Unknown connector");
