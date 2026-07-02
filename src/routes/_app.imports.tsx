@@ -178,128 +178,24 @@ function ImportsPage() {
   }
 
   /**
-   * Delete an imported batch and ALL data it produced:
-   *   - orders created during the import window
-   *   - their order_items
-   *   - related packing_records (matched by order_number / tracking_number)
-   *   - related returns (matched by order_id)
-   *   - the import history record itself
-   *
-   * Orders are matched by a tight ±60s window around the import's created_at,
-   * which is the period in which confirmImport() inserts its rows. After
-   * deletion the same Desty OMS file can be re-imported because the unique
-   * (workspace_id, order_number) rows are gone.
+   * Delete an imported batch and every record it produced. All the heavy
+   * lifting (order lookup + chunked cascading deletes for returns,
+   * packing_records, order_items, orders, and finally the imports row)
+   * runs server-side in `deleteImportBatch` so that:
+   *   - RLS + role check enforce Owner/Supervisor only
+   *   - .in(...) queries are chunked to avoid URL length limits that
+   *     silently truncated deletes when a batch had many packed orders
+   *   - packing_records referenced by returns (SET NULL FK) get cleaned
+   *     before their parent rows disappear — no orphans.
    */
   async function deleteImport(id: string) {
     const wid = ws.data?.workspace?.id;
     if (!wid) return;
     setDeleting(true);
     try {
-      // 1) Ambil semua order yang memiliki batch ID ini (jika ada relasi kolom),
-      // atau cari orderIds berdasarkan rentang waktu batch ini jika tidak ada kolom langsung.
-      const { data: imp, error: impFetchErr } = await db
-        .from("imports")
-        .select("created_at, filename")
-        .eq("id", id)
-        .maybeSingle();
-      if (impFetchErr) {
-        toast.error(impFetchErr.message);
-        return;
-      }
-
-      if (imp) {
-        const createdAt = new Date(imp.created_at);
-        const from = new Date(createdAt.getTime() - 60_000).toISOString();
-        const to = new Date(createdAt.getTime() + 60_000).toISOString();
-
-        const { data: orderRows, error: orderFetchErr } = await db
-          .from("orders")
-          .select("id, order_number, tracking_number")
-          .eq("workspace_id", wid)
-          .gte("created_at", from)
-          .lte("created_at", to);
-        if (orderFetchErr) {
-          toast.error(orderFetchErr.message);
-          return;
-        }
-
-        const orderIds = (orderRows ?? []).map((r: { id: string }) => r.id);
-        const orderNumbers = (orderRows ?? [])
-          .map((r: { order_number: string | null }) => r.order_number)
-          .filter((n: string | null): n is string => !!n);
-        const trackingNumbers = (orderRows ?? [])
-          .map((r: { tracking_number: string | null }) => r.tracking_number)
-          .filter((n: string | null): n is string => !!n);
-
-        if (orderIds.length) {
-          // PERBAIKAN: Hapus data returns secara andal satu per satu atau batasi chunk
-          // untuk menghindari kegagalan 'Bad Request' akibat batasan query .in() Supabase
-          for (const orderId of orderIds) {
-            const { error: returnsErr } = await db
-              .from("returns")
-              .delete()
-              .eq("workspace_id", wid)
-              .eq("order_id", orderId);
-
-            if (returnsErr) {
-              toast.error(`Couldn't delete related returns: ${returnsErr.message}`);
-              return;
-            }
-          }
-
-          // 2) Related packing_records — matched by order_number OR tracking_number.
-          if (orderNumbers.length) {
-            const { error: prByNumberErr } = await db
-              .from("packing_records")
-              .delete()
-              .eq("workspace_id", wid)
-              .in("order_number", orderNumbers);
-            if (prByNumberErr) {
-              toast.error(`Couldn't delete packing records: ${prByNumberErr.message}`);
-              return;
-            }
-          }
-          if (trackingNumbers.length) {
-            const { error: prByTrackingErr } = await db
-              .from("packing_records")
-              .delete()
-              .eq("workspace_id", wid)
-              .in("tracking_number", trackingNumbers);
-            if (prByTrackingErr) {
-              toast.error(`Couldn't delete packing records: ${prByTrackingErr.message}`);
-              return;
-            }
-          }
-
-          // 3) Order items, kemudian orders (Sesuai urutan FK dependensi).
-          const { error: itemsErr } = await db
-            .from("order_items")
-            .delete()
-            .eq("workspace_id", wid)
-            .in("order_id", orderIds);
-          if (itemsErr) {
-            toast.error(`Couldn't delete order items: ${itemsErr.message}`);
-            return;
-          }
-
-          const { error: ordersErr } = await db.from("orders").delete().eq("workspace_id", wid).in("id", orderIds);
-          if (ordersErr) {
-            toast.error(`Couldn't delete orders: ${ordersErr.message}`);
-            return;
-          }
-        }
-      }
-
-      // 4) Terakhir hapus baris riwayat import batch itu sendiri
-      const { error } = await db.from("imports").delete().eq("id", id).eq("workspace_id", wid);
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-
+      await deleteImportFn({ data: { importId: id } });
       toast.success("Imported batch and all related data deleted.");
 
-      // PERBAIKAN: Memastikan semua queries yang berkaitan langsung di-refresh/invalidate
       qc.invalidateQueries({ queryKey: ["imports"] });
       qc.invalidateQueries({ queryKey: ["orders"] });
       qc.invalidateQueries({ queryKey: ["order_items"] });
