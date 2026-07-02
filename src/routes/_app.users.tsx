@@ -86,7 +86,7 @@ type Invitation = {
   account_expires_at: string | null;
 };
 
-type InviteRole = "Packer" | "Return Staff" | "Supervisor";
+type InviteRole = "Packer" | "Return Staff" | "Supervisor" | "Monitor";
 
 const EXPIRATION_OPTIONS: { label: string; days: number | null }[] = [
   { label: "1 Day", days: 1 },
@@ -354,7 +354,7 @@ function UsersPage() {
       <PageHeader
         title={t("users.title")}
         description={t("users.description")}
-        actions={
+        actions={ws?.role === "Monitor" ? null : (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button size="sm" disabled={!isOwner}>
@@ -395,6 +395,7 @@ function UsersPage() {
                         <SelectItem value="Packer">Packer</SelectItem>
                         <SelectItem value="Return Staff">Return Staff</SelectItem>
                         <SelectItem value="Supervisor">Supervisor</SelectItem>
+                        <SelectItem value="Monitor">Monitor (read-only)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -421,7 +422,7 @@ function UsersPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        }
+        )}
       />
 
       <div className="rounded-lg border bg-card shadow-card">
@@ -492,7 +493,7 @@ function UsersPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {(["Supervisor", "Packer", "Return Staff"] as AppRole[]).map((r) => (
+                        {(["Supervisor", "Packer", "Return Staff", "Monitor"] as AppRole[]).map((r) => (
                           <DropdownMenuItem
                             key={r}
                             disabled={u.role === r}

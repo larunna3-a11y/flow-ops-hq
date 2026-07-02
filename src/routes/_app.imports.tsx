@@ -52,6 +52,8 @@ function ImportsPage() {
 
   const role = ws.data?.role ?? null;
   const canDelete = role === "Owner" || role === "Supervisor";
+  // Monitor is a read-only observer — it may view the import history but cannot upload files.
+  const canUpload = role !== "Monitor";
 
   async function onFileChosen(file: File) {
     setParsing(true);
@@ -221,41 +223,43 @@ function ImportsPage() {
         description="Upload your Desty OMS order export. We'll detect the format automatically."
       />
 
-      {/* Uploader */}
-      <div className="rounded-lg border bg-card shadow-card p-6">
-        <div className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-border bg-muted/30 py-10 px-4 text-center">
-          <FileSpreadsheet className="h-10 w-10 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-medium">Drop your Desty OMS Excel file here</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              No template, no mapping. Upload the original .xlsx export.
-            </p>
+      {/* Uploader — hidden for Monitor (read-only observer). */}
+      {canUpload && (
+        <div className="rounded-lg border bg-card shadow-card p-6">
+          <div className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-border bg-muted/30 py-10 px-4 text-center">
+            <FileSpreadsheet className="h-10 w-10 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium">Drop your Desty OMS Excel file here</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                No template, no mapping. Upload the original .xlsx export.
+              </p>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFileChosen(f);
+              }}
+            />
+            <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={parsing || importing}>
+              {parsing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Reading file…
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose file
+                </>
+              )}
+            </Button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onFileChosen(f);
-            }}
-          />
-          <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={parsing || importing}>
-            {parsing ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Reading file…
-              </>
-            ) : (
-              <>
-                <Upload className="h-4 w-4 mr-2" />
-                Choose file
-              </>
-            )}
-          </Button>
         </div>
-      </div>
+      )}
 
       {/* Preview */}
       {preview && (

@@ -49,7 +49,11 @@ export function AppSidebar() {
     { title: t("sidebar.items.orders"), url: "/orders", icon: ShoppingCart, m: "orders" as const },
     { title: t("sidebar.items.packing"), url: "/packing", icon: PackageCheck, m: "packing" as const },
     { title: t("sidebar.items.returns"), url: "/returns", icon: RotateCcw, m: "returns" as const },
-  ].filter((i) => allow(i.m));
+  ]
+    .filter((i) => allow(i.m))
+    // Monitor is a read-only observer — the sidebar hides Imports and Orders
+    // even though the routes remain viewable via direct navigation.
+    .filter((i) => role !== "Monitor" || (i.m !== "imports" && i.m !== "orders"));
 
 
   const insights = [

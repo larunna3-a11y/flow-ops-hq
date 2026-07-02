@@ -130,11 +130,14 @@ function PackingPage() {
 
   const role = ws.data?.role ?? null;
   const currentUserId = ws.data?.userId ?? null;
-  const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
-  const canDelete = role === "Owner" || role === "Supervisor";
-  /** Owners & Supervisors can edit every record; Packers only their own. */
+  // Monitor is a read-only observer — no scanner, no camera, no edits, no deletes.
+  const isReadOnly = role === "Monitor";
+  const canOverrideDuplicate = !isReadOnly && (role === "Owner" || role === "Supervisor");
+  const canDelete = !isReadOnly && (role === "Owner" || role === "Supervisor");
+  /** Owners & Supervisors can edit every record; Packers only their own. Monitor cannot edit. */
   const canEditRecord = (recordUserId: string | null | undefined) =>
-    role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
+    !isReadOnly &&
+    (role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId));
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
@@ -593,14 +596,16 @@ function PackingPage() {
         title={t("packing.title")}
         description={t("packing.description")}
         actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
-              <Camera className="h-4 w-4" /> Camera
-            </Button>
-            <Button size="sm" onClick={() => codeRef.current?.focus()}>
-              <ScanLine className="h-4 w-4" /> Focus scanner
-            </Button>
-          </>
+          isReadOnly ? null : (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setCameraOpen(true)}>
+                <Camera className="h-4 w-4" /> Camera
+              </Button>
+              <Button size="sm" onClick={() => codeRef.current?.focus()}>
+                <ScanLine className="h-4 w-4" /> Focus scanner
+              </Button>
+            </>
+          )
         }
       />
 
@@ -654,7 +659,7 @@ function PackingPage() {
       </div>
 
       {/* ── Scan input ─────────────────────────────────────────────────────── */}
-      {!scan.editingRecordId && (
+      {!isReadOnly && !scan.editingRecordId && (
         <form onSubmit={handleSubmit} className="rounded-lg border bg-card p-4 shadow-card space-y-3">
           <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
             <div className="space-y-1.5">
