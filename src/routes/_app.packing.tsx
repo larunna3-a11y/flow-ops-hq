@@ -130,11 +130,14 @@ function PackingPage() {
 
   const role = ws.data?.role ?? null;
   const currentUserId = ws.data?.userId ?? null;
-  const canOverrideDuplicate = role === "Owner" || role === "Supervisor";
-  const canDelete = role === "Owner" || role === "Supervisor";
-  /** Owners & Supervisors can edit every record; Packers only their own. */
+  // Monitor is a read-only observer — no scanner, no camera, no edits, no deletes.
+  const isReadOnly = role === "Monitor";
+  const canOverrideDuplicate = !isReadOnly && (role === "Owner" || role === "Supervisor");
+  const canDelete = !isReadOnly && (role === "Owner" || role === "Supervisor");
+  /** Owners & Supervisors can edit every record; Packers only their own. Monitor cannot edit. */
   const canEditRecord = (recordUserId: string | null | undefined) =>
-    role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId);
+    !isReadOnly &&
+    (role === "Owner" || role === "Supervisor" || (!!currentUserId && recordUserId === currentUserId));
 
   const recordsQuery = usePackingRecords();
   const records = recordsQuery.data ?? [];
