@@ -193,7 +193,8 @@ function ImportsPage() {
     if (!wid) return;
     setDeleting(true);
     try {
-      await deleteImportFn({ data: { importId: id } });
+      const result = await deleteImportFn({ data: { importId: id } });
+      console.log(result);
       toast.success("Imported batch and all related data deleted.");
 
       qc.invalidateQueries({ queryKey: ["imports"] });
